@@ -28,7 +28,7 @@ always gets the same bytes:
 | PyYAML (runtime) | [`requirements.in`](../requirements.in) → [`requirements.txt`](../requirements.txt) | exact version and SHA-256 hashes (`pip-compile --generate-hashes`) | `pip install --require-hashes --no-deps` |
 | Check and test tools (pytest, coverage, Hypothesis, ruff, yamllint, PyYAML) | [`requirements-dev.in`](../requirements-dev.in) → [`requirements-dev.txt`](../requirements-dev.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` |
 | Atheris (coverage-guided fuzzing, Linux x86_64 only) | [`requirements-fuzz.in`](../requirements-fuzz.in) → [`requirements-fuzz.txt`](../requirements-fuzz.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` in [`fuzz.yml`](../.github/workflows/fuzz.yml) |
-| Linters and scanners used only by CI (actionlint, hadolint, gitleaks) | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | version tag and digest | Docker |
+| Linters and scanners used only by CI (actionlint, hadolint, gitleaks, Trivy) | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | version tag and digest | Docker |
 | GitHub Actions | [`.github/workflows/`](../.github/workflows/) | full commit SHA (version in a comment) | GitHub Actions |
 
 Released images carry an SBOM listing every package in them ([verifying-releases.md](verifying-releases.md)).
@@ -50,8 +50,17 @@ To update a pinned Python dependency, edit the `.in` file if needed and run
 
 ## Policy for vulnerabilities in dependencies
 
-Known vulnerabilities are found by Dependabot alerts (Python packages, Actions), dependency review on pull
-requests, and the base image's own advisories (Debian and the Python image).
+Known vulnerabilities are found by:
+
+- the weekly **image scan** ([`.github/workflows/scan.yml`](../.github/workflows/scan.yml)): Trivy scans the
+  image built from `main` and the latest published release for HIGH and CRITICAL vulnerabilities that have a
+  fix available, and reports each as a
+  [code scanning alert](https://github.com/HoneyBearTech/trash-watch/security/code-scanning);
+- **Dependabot alerts** for the Python packages and the Actions, and **dependency review** on pull requests;
+- the base image's own advisories (Debian and the Python image).
+
+The image applies Debian's security updates when it's built, and removes pip once PyYAML is installed, so
+neither waits for the Python image to be rebuilt.
 
 Each finding is triaged within 14 days:
 
@@ -66,8 +75,12 @@ Each finding is triaged within 14 days:
 
 ### Current findings
 
-None known as of 6 October 2026. Planned: a scheduled image scan (Trivy) like the maintainer's other
-projects, reported to code scanning.
+As of 6 October 2026: the first image scan found 11 HIGH-severity vulnerabilities with fixes in the 0.1.0
+image: OpenSSL (CVE-2026-75804, CVE-2026-84782) and PCRE2 (CVE-2026-103111) from the base image's Debian
+packages, and urllib3, msgpack and setuptools' `pkg_resources` vendored inside pip. Assessment: OpenSSL is
+reachable (git and the notifications make TLS connections), so the fix ships in a patch release; pip's
+vendored packages never run in trash-watch. The image built from `main` has none: it applies Debian's
+security updates at build time and no longer contains pip.
 
 ## Licenses
 
