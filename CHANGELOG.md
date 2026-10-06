@@ -6,6 +6,10 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-06
+
+A security release for the image; trash-watch itself is unchanged.
+
 ### Security
 
 - The image applies Debian's security updates when it's built and no longer contains pip, which fixes 11
@@ -81,5 +85,6 @@ The first release.
   `docker run --rm -v "$PWD/data:/data" busybox chown -R 1000:1000 /data` ([docs/upgrading.md](docs/upgrading.md)).
   Without it, trash-watch stops with an error that names this command.
 
-[Unreleased]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HoneyBearTech/trash-watch/releases/tag/v0.1.0
