@@ -27,4 +27,6 @@ COPY trash_watch.py LICENSE ./
 # No .pyc files (the root filesystem is read-only in compose); git's HOME is the writable /tmp.
 ENV PYTHONDONTWRITEBYTECODE=1 HOME=/tmp
 USER 1000:1000
+# Unhealthy when no check has completed within two intervals (see --health); the first check gets 15 minutes.
+HEALTHCHECK --interval=5m --timeout=30s --start-period=15m --retries=1 CMD ["python", "-u", "trash_watch.py", "--health"]
 CMD ["python", "-u", "trash_watch.py"]

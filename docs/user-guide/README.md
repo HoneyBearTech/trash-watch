@@ -73,6 +73,13 @@ For a CF that was removed or renamed upstream, look up its replacement in the gu
 `trash_id`. For a `changed upstream` item, `recyclarr sync --preview` shows what the guide change does to
 your setup.
 
+## Knowing it's still checking
+
+The container reports its own health: `docker compose ps` shows `(healthy)` while checks keep completing,
+and `(unhealthy)` when none has completed for two intervals, whether it crashed, hangs or every check
+fails. Point your monitoring at that (for example an Uptime Kuma "Docker container" monitor), or run the
+check yourself: `docker exec trash-watch python -u trash_watch.py --health`.
+
 ## Hearing about it again
 
 To get the current findings notified again (for example after changing the notifier), delete

@@ -90,7 +90,8 @@ docker compose up -d --build
 docker compose logs -f trash-watch
 ```
 
-It checks at start-up and then every `INTERVAL_HOURS`. To update it: `git pull && docker compose up -d --build`.
+It checks at start-up and then every `INTERVAL_HOURS`; `docker compose ps` shows it `(healthy)` while checks keep
+completing. To update it: `git pull && docker compose up -d --build`.
 
 ## Settings (`.env`)
 

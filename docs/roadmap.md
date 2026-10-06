@@ -19,7 +19,6 @@ first release: a signed multi-arch image on GHCR with an SBOM and provenance.
 
 **Releases and security**
 
-- `RUN_ONCE=1` exiting non-zero when a check fails, so a one-time check can be scripted.
 - Type annotations throughout, and ruff's full rule set.
 
 **Security and project health**
@@ -38,8 +37,6 @@ first release: a signed multi-arch image on GHCR with an SBOM and provenance.
 
 **Operations**
 
-- A health signal for monitoring (for example a log line or file a monitoring stack can alert on when no
-  check has run for two intervals).
 - More notification channels if asked for (for example Gotify or generic webhooks).
 
 **1.0**: stable settings and state format ([interfaces.md](interfaces.md)), with upgrades that need no
