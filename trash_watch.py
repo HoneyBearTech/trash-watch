@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-"""
-trash-watch: checks a Recyclarr config against the current TRaSH Guides JSON.
+"""trash-watch: check a Recyclarr config against the current TRaSH Guides JSON.
 
 Reports:
   - trash_ids in your config that no longer exist upstream (removed/renamed CFs)
   - CFs the guide's profile (e.g. an SQP) includes that your profile doesn't score, or that are missing
   - a profile whose score_set differs from the guide profile's
   - scores you set that differ from the guide's score for that profile's score set
-  - CFs/profiles you use whose definition changed upstream since the last run
+  - CFs, profiles and CF groups you use whose definition changed upstream since the last run
 Only notifies when the findings change, so it won't spam you daily. Anything listed in IGNORE is skipped;
 profiles it can't match to a guide profile are listed in the log on every run.
 """
@@ -22,8 +20,20 @@ import subprocess
 import time
 import urllib.request
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import yaml
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+# Parsed JSON and YAML: the guides and the operator's config. Values are checked where they're used.
+type JsonValue = Any
+type Block = dict[str, JsonValue]  # a custom_formats block, a profile, a guide CF/profile/group, a gap
+type Finding = tuple[str, str]  # (heading, item): "radarr/movies · SQP-1", "missing x265 (HD)"
+type AppGuides = dict[str, dict[str, Block]]  # "cf" / "qp" / "groups" -> trash_id -> JSON
+type Guides = dict[str, AppGuides]  # "radarr" / "sonarr" -> AppGuides
+type Instance = tuple[str, str, list[Block], list[Block]]  # app, instance name, CF blocks, profiles
 
 GUIDES_REPO = "https://github.com/TRaSH-Guides/Guides.git"
 DATA = Path(os.getenv("DATA_DIR", "/data"))
@@ -61,6 +71,7 @@ STATE_VERSION = 2  # bump when fingerprints change shape: the next run re-baseli
 CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff\ufffe\uffff]+")
 MAX_LINES = 20  # notification body cap, so it reads on a phone; the log always gets everything
 PER_GROUP = 3  # items shown per profile in a notification, so one busy profile can't hide the rest
+DISCORD_LIMIT = 2000  # characters per Discord message
 
 
 class Loader(yaml.SafeLoader):
@@ -71,21 +82,27 @@ for _tag in ("!secret", "!env_var"):
     Loader.add_constructor(_tag, lambda _loader, node: str(node.value))
 
 
-def load_yaml(text):
+def load_yaml(text: str) -> JsonValue:
+    """Parse YAML from the config with the safe loader above."""
     return yaml.load(text, Loader=Loader)  # noqa: S506 - Loader is a SafeLoader subclass (see above)
 
 
-# git runs with fixed arguments (no shell); the only variable parts are this script's own paths and
-# GUIDES_REPO. It's found on PATH, as installed in the image.
-def git(*args, cwd=None):
+def git(*args: str, cwd: Path | None = None) -> str:
+    """Run git with fixed arguments (no shell) and return its output.
+
+    The only variable parts are this script's own paths and GUIDES_REPO; git is found on PATH, as installed
+    in the image.
+    """
     command = ["git", *args]
     result = subprocess.run(command, cwd=cwd or CACHE, check=True, capture_output=True, text=True)  # noqa: S603
     return result.stdout.strip()
 
 
-def check_data_writable():
-    """Fail early, with the fix, when the data directory belongs to another user (for example root-owned
-    from an older, root-running image, or created by Docker before the first start)."""
+def check_data_writable() -> None:
+    """Fail early, with the fix, when the data directory belongs to another user.
+
+    For example root-owned from an older, root-running image, or created by Docker before the first start.
+    """
     try:
         DATA.mkdir(parents=True, exist_ok=True)
         probe = DATA / ".write-test"
@@ -101,7 +118,8 @@ def check_data_writable():
         raise PermissionError(msg) from e
 
 
-def sync_guides():
+def sync_guides() -> str:
+    """Clone or update the sparse, shallow guides checkout (docs/json only); return its short commit."""
     check_data_writable()
     if not (CACHE / ".git").exists():
         clone = ("clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse", GUIDES_REPO, str(CACHE))
@@ -113,7 +131,8 @@ def sync_guides():
     return git("rev-parse", "--short", "HEAD")
 
 
-def load_guides():
+def load_guides() -> Guides:
+    """Load every CF, quality profile and CF group of each app, keyed by trash_id."""
     guides = {}
     for app in APPS:
         base = CACHE / "docs/json" / app
@@ -124,7 +143,8 @@ def load_guides():
     return guides
 
 
-def config_files():
+def config_files() -> list[Path]:
+    """Return the Recyclarr config files: recyclarr.yml or .yaml, then configs/*.yml."""
     files = [p for p in (CONFIG_ROOT / "recyclarr.yml", CONFIG_ROOT / "recyclarr.yaml") if p.exists()]
     configs_dir = CONFIG_ROOT / "configs"
     if configs_dir.is_dir():
@@ -132,7 +152,8 @@ def config_files():
     return files
 
 
-def template_path(app, template_id):
+def template_path(app: str, template_id: str) -> Path | None:
+    """Find a template include in includes.json of Recyclarr's config-templates checkout."""
     for repo in TEMPLATE_REPOS:
         index = CONFIG_ROOT / repo / "includes.json"
         if index.exists():
@@ -143,9 +164,25 @@ def template_path(app, template_id):
     return None
 
 
-def load_instances(warnings):
-    """(app, instance, custom_formats, quality_profiles) per instance, with local and template includes
-    merged in. Anything that can't be read or isn't understood goes to warnings (log only)."""
+def read_include(app: str, include: Block) -> Block | None:
+    """Return the contents of an `include:` entry (local `config:` or `template:`), or None if not found."""
+    if "config" in include:
+        path = Path(include["config"])
+        path = path if path.is_absolute() else CONFIG_ROOT / "includes" / path
+    elif "template" in include:
+        path = template_path(app, include["template"])
+    else:
+        return None
+    return (load_yaml(path.read_text()) or {}) if path and path.exists() else None
+
+
+def load_instances(warnings: list[str]) -> list[Instance]:
+    """Return every Radarr/Sonarr instance in the config, with local and template includes merged in.
+
+    Anything that can't be read or isn't understood goes to warnings (log only). Profiles that are only
+    named in assign_scores_to count as profiles; custom_format_groups sections ride along as marker blocks
+    for check() to resolve against the guides.
+    """
     instances = []
     for f in config_files():
         doc = load_yaml(f.read_text()) or {}
@@ -154,47 +191,41 @@ def load_instances(warnings):
                 inst = settings or {}
                 tag = f"{app}/{name}"
                 cfs = list(inst.get("custom_formats") or [])
-                groups = [inst["custom_format_groups"]] if inst.get("custom_format_groups") else []
                 qps = list(inst.get("quality_profiles") or [])
-                for inc in inst.get("include") or []:
-                    if "config" in inc:
-                        p = Path(inc["config"])
-                        p = p if p.is_absolute() else CONFIG_ROOT / "includes" / p
-                    elif "template" in inc:
-                        p = template_path(app, inc["template"])
-                    else:
-                        p = None
-                    if not (p and p.exists()):
+                groups = [inst["custom_format_groups"]] if inst.get("custom_format_groups") else []
+                for include in inst.get("include") or []:
+                    d = read_include(app, include)
+                    if d is None:
                         warnings.append(
-                            f"{tag}: include {inc} not found; CFs it adds aren't counted, "
+                            f"{tag}: include {include} not found; CFs it adds aren't counted, "
                             f"so 'missing' findings for this instance may be wrong"
                         )
                         continue
-                    d = load_yaml(p.read_text()) or {}
                     cfs += d.get("custom_formats") or []
+                    qps += d.get("quality_profiles") or []
                     if d.get("custom_format_groups"):
                         groups.append(d["custom_format_groups"])
-                    qps += d.get("quality_profiles") or []
-                for key in sorted(set(inst) - KNOWN_KEYS):
-                    warnings.append(
-                        f"{tag}: '{key}' isn't understood by trash-watch; findings for this instance may be incomplete"
-                    )
-                # Profiles that are only scored (defined in the app, not in quality_profiles) count too
+                warnings += [
+                    f"{tag}: '{key}' isn't understood by trash-watch; findings for this instance may be incomplete"
+                    for key in sorted(set(inst) - KNOWN_KEYS)
+                ]
                 named = {qp.get("name") for qp in qps}
                 for block in cfs:
                     for a in block.get("assign_scores_to") or []:
                         if a.get("name") and a["name"] not in named:
                             qps.append({"name": a["name"]})
                             named.add(a["name"])
-                # Group sections ride along as marker blocks; check() resolves them against the guides
                 cfs += [{"custom_format_groups": g} for g in groups]
                 instances.append((app, name, cfs, qps))
     return instances
 
 
-def match_guide_profile(qp, guide_qps):
-    """Guide profile for a config profile, and how it was matched: by trash_id (guide-backed), PROFILE_MAP
-    (trash_id or guide name), name (with or without the '[SQP] ' style prefix), or a unique score_set."""
+def match_guide_profile(qp: Block, guide_qps: dict[str, Block]) -> tuple[Block | None, str | None]:
+    """Find the guide profile for a config profile, and say how it was matched.
+
+    By trash_id (guide-backed), PROFILE_MAP (trash_id or guide name), name (with or without the '[SQP] '
+    style prefix), or a score_set only one guide profile uses.
+    """
     by_name = {g["name"].lower(): g for g in guide_qps.values()}
     if qp.get("trash_id"):
         return guide_qps.get(qp["trash_id"]), "trash_id"
@@ -211,29 +242,37 @@ def match_guide_profile(qp, guide_qps):
     return None, None
 
 
-def guide_score(cf, score_set):
-    """The guide's score for a CF in a score set, falling back to its default. None if it has neither, or if
-    the guide's value isn't an integer (it ends up in notifications and in YAML the operator pastes)."""
+def guide_score(cf: Block | None, score_set: str) -> int | None:
+    """Return the guide's score for a CF in a score set, falling back to its default.
+
+    None if it has neither, or if the guide's value isn't an integer (it ends up in notifications and in
+    YAML the operator pastes).
+    """
     scores = (cf or {}).get("trash_scores", {})
     score = scores.get(score_set, scores.get("default")) if isinstance(scores, dict) else None
     return score if isinstance(score, int) and not isinstance(score, bool) else None
 
 
-def one_line(text):
-    """Text from the guides or the config as a single line: line breaks and other control characters
-    become spaces, so a name can't add lines to a notification or to YAML the operator pastes."""
+def one_line(text: object) -> str:
+    """Return text from the guides or the config as a single line.
+
+    Line breaks and other control characters become spaces, so a name can't add lines to a notification or
+    to YAML the operator pastes.
+    """
     return CONTROL_CHARS.sub(" ", str(text))
 
 
-def group_profiles(group):
-    """trash_ids of the guide quality profiles a CF group is meant for (its quality_profiles include list)."""
+def group_profiles(group: Block) -> set[str]:
+    """Return the trash_ids of the guide quality profiles a CF group is meant for (its include list)."""
     include = (group.get("quality_profiles") or {}).get("include") or {}
     return set(include.values()) if isinstance(include, dict) else set()
 
 
-def group_cfs(group, entry):
-    """The CFs Recyclarr syncs for a group entry: the required ones, the defaults minus `exclude`, plus `select`
-    (or every optional one with `select_all`)."""
+def group_cfs(group: Block, entry: Block) -> set[str]:
+    """Return the CFs Recyclarr syncs for a group entry.
+
+    The required ones, the defaults minus `exclude`, plus `select` (or every optional one with `select_all`).
+    """
     members = [c for c in group.get("custom_formats") or [] if isinstance(c, dict) and c.get("trash_id")]
     required = {c["trash_id"] for c in members if c.get("required") is True}
     default = {c["trash_id"] for c in members if c.get("default") is True}
@@ -242,12 +281,16 @@ def group_cfs(group, entry):
     return chosen | (optional if entry.get("select_all") is True else set(entry.get("select") or []) & optional)
 
 
-def resolve_groups(tag, cfs, qps, g):
-    """Turns the instance's custom_format_groups (Recyclarr v8) into ordinary CF blocks, so the per-profile
-    checks see the CFs groups add. Groups listed under `add` score the profiles in their `assign_scores_to`, or
-    else the guide-backed profiles they're meant for; default groups are synced for those profiles too unless
-    skipped. Returns the blocks without the group sections plus the resolved ones, findings for group
-    references that went stale upstream, and the groups in use."""
+def resolve_groups(
+    tag: str, cfs: list[Block], qps: list[Block], g: AppGuides
+) -> tuple[list[Block], list[Finding], set[str]]:
+    """Turn the instance's custom_format_groups (Recyclarr v8) into ordinary CF blocks.
+
+    So the per-profile checks see the CFs groups add. Groups listed under `add` score the profiles in their
+    `assign_scores_to`, or else the guide-backed profiles they're meant for; default groups are synced for
+    those profiles too unless skipped. Returns the blocks without the group sections plus the resolved
+    ones, findings for group references that went stale upstream, and the groups in use.
+    """
     groups = g.get("groups") or {}
     sections = [b["custom_format_groups"] for b in cfs if isinstance(b.get("custom_format_groups"), dict)]
     plain = [b for b in cfs if "custom_format_groups" not in b]
@@ -281,10 +324,28 @@ def resolve_groups(tag, cfs, qps, g):
     return plain + blocks, findings, used
 
 
-def check(app, inst, cfs, qps, guides, gaps=None):
-    """Findings are (group, item) pairs; the group is the instance or instance · profile. Also returns the
-    CFs, guide profiles and score sets in use (for fingerprints) and one coverage line per profile (log).
-    With a gaps list, also appends one dict per guide CF a profile doesn't score (used by --suggest)."""
+def scored_in(cfs: list[Block], profile_name: str | None) -> dict[str, JsonValue]:
+    """Return the CFs a profile scores (the blocks whose assign_scores_to names it), with any explicit score."""
+    scored = {}
+    for block in cfs:
+        for a in block.get("assign_scores_to") or []:
+            if a.get("name") == profile_name:
+                scored.update(dict.fromkeys(block.get("trash_ids") or [], a.get("score")))
+    return scored
+
+
+def check(  # noqa: C901, PLR0912 - one pass over the profiles, in config order, keeps the log and findings in step
+    instance: Instance,
+    guides: Guides,
+    gaps: list[Block] | None = None,
+) -> tuple[list[Finding], set[str], set[str], set[str], list[str], set[str]]:
+    """Check one instance against the guides.
+
+    Returns the findings ((heading, item) pairs, the heading being the instance or instance · profile), the
+    CFs, guide profiles, score sets and CF groups in use (for fingerprints), and one coverage line per
+    profile (log). With a gaps list, also appends one dict per guide CF a profile doesn't score (--suggest).
+    """
+    app, inst, cfs, qps = instance
     g = guides[app]
     tag = f"{app}/{inst}"
     used_cfs, used_qps, score_sets, coverage = set(), set(), {"default"}, []
@@ -304,12 +365,12 @@ def check(app, inst, cfs, qps, guides, gaps=None):
         if IGNORE & {label, qp.get("trash_id"), gq and gq["trash_id"]}:
             coverage.append(f"{tag} · {label}: ignored (IGNORE)")
             continue
-        group = f"{tag} · {label}"
+        heading = f"{tag} · {label}"
         if gq and gq["name"] != label:
-            group += f" (guide: {gq['name']})"
+            heading += f" (guide: {gq['name']})"
         if not gq:
             if qp.get("trash_id"):
-                findings.append((group, "profile trash_id not found upstream"))
+                findings.append((heading, "profile trash_id not found upstream"))
             coverage.append(
                 f"{tag} · {label}: NOT CHECKED, no guide profile matches "
                 f"(add it to PROFILE_MAP, or to IGNORE if it's your own)"
@@ -324,21 +385,14 @@ def check(app, inst, cfs, qps, guides, gaps=None):
         score_sets.add(score_set)
         guide_set = gq.get("trash_score_set", "default")
         if score_set != guide_set:
-            findings.append((group, f"score_set {score_set}, guide uses {guide_set}"))
-        # The CFs this profile scores are the blocks whose assign_scores_to names it, not the whole instance
-        scored = {}  # trash_id -> explicit score, or None for the guide's
-        for block in cfs:
-            for a in block.get("assign_scores_to") or []:
-                if a.get("name") == qp.get("name"):
-                    scored.update(dict.fromkeys(block.get("trash_ids") or [], a.get("score")))
+            findings.append((heading, f"score_set {score_set}, guide uses {guide_set}"))
+        scored = scored_in(cfs, qp.get("name"))
         for cf_name, tid in gq.get("formatItems", {}).items():
             if tid in IGNORE or tid in scored:
                 continue
+            synced = tid in used_cfs
             findings.append(
-                (
-                    group,
-                    f"{cf_name}: synced, but not scored in this profile" if tid in used_cfs else f"missing {cf_name}",
-                )
+                (heading, f"{cf_name}: synced, but not scored in this profile" if synced else f"missing {cf_name}")
             )
             if gaps is not None:
                 gaps.append(
@@ -351,7 +405,7 @@ def check(app, inst, cfs, qps, guides, gaps=None):
                         "trash_id": tid,
                         "cf": cf_name,
                         "score": guide_score(g["cf"].get(tid), score_set),
-                        "synced": tid in used_cfs,
+                        "synced": synced,
                     }
                 )
         for tid, score in scored.items():
@@ -359,13 +413,15 @@ def check(app, inst, cfs, qps, guides, gaps=None):
                 continue
             want = guide_score(g["cf"][tid], score_set)
             if want is not None and want != score:
-                findings.append((group, f"{g['cf'][tid]['name']}: {score}, guide {want}"))
+                findings.append((heading, f"{g['cf'][tid]['name']}: {score}, guide {want}"))
     return findings, used_cfs, used_qps, score_sets, coverage, used_groups
 
 
-def cf_fingerprint(cf, score_sets):
-    """What a CF does for you: its conditions, rename flag, and its scores in the sets you use. Upstream
-    edits to descriptions, links or other languages' score sets don't count as a change."""
+def cf_fingerprint(cf: Block, score_sets: Iterable[str]) -> str:
+    """Fingerprint what a CF does for you: its conditions, rename flag, and its scores in the sets you use.
+
+    Upstream edits to descriptions, links or other languages' score sets don't count as a change.
+    """
     scores = cf.get("trash_scores", {})
     return digest(
         {
@@ -376,19 +432,28 @@ def cf_fingerprint(cf, score_sets):
     )
 
 
-def qp_fingerprint(qp):
-    """A guide profile or CF group: everything but its description and grouping."""
-    return digest({k: v for k, v in qp.items() if k not in ("trash_description", "trash_url", "group")})
+def qp_fingerprint(qp: Block) -> str:
+    """Fingerprint a guide profile or CF group: everything but its description and grouping."""
+    return digest({k: v for k, v in qp.items() if k not in {"trash_description", "trash_url", "group"}})
 
 
-def digest(obj):
+def digest(obj: JsonValue) -> str:
+    """Return a short SHA-256 of a JSON-serialisable value."""
     return hashlib.sha256(json.dumps(obj, sort_keys=True).encode()).hexdigest()[:16]
 
 
-def render(findings, max_lines=None, max_chars=None, bold=False):
-    """Findings grouped by instance/profile: a heading per group, then one bullet per item,
-    upstream changes last. With max_lines (a notification), each group shows PER_GROUP items,
-    whole groups are added while they fit, and a 'plus N more' footer covers the rest."""
+def render(
+    findings: Iterable[Finding],
+    *,
+    max_lines: int | None = None,
+    max_chars: int | None = None,
+    bold: bool = False,
+) -> str:
+    """Render findings grouped by instance/profile: a heading per group, then one bullet per item.
+
+    Upstream changes come last. With max_lines (a notification), each group shows PER_GROUP items, whole
+    groups are added while they fit, and a 'plus N more' footer covers the rest.
+    """
     groups = {}
     for group, item in sorted({(one_line(g), one_line(i)) for g, i in findings}):
         groups.setdefault(group, []).append(item)
@@ -411,7 +476,8 @@ def render(findings, max_lines=None, max_chars=None, bold=False):
     return "\n".join(lines)
 
 
-def post(name, url, data, headers):
+def post(name: str, url: str, data: bytes, headers: dict[str, str]) -> None:
+    """POST a notification; log failures instead of raising, so one target can't stop the other or the loop."""
     if not url.lower().startswith(("https://", "http://")):  # no file: or other schemes from a typo'd .env
         print(f"notify via {name} skipped: the URL must start with https:// or http://", flush=True)
         return
@@ -422,26 +488,31 @@ def post(name, url, data, headers):
         print(f"notify via {name} failed: {e}", flush=True)
 
 
-def notify(title, findings=(), text=None):
-    """Logs everything; ntfy/Discord get the phone-sized version (MAX_LINES, Discord's 2000 chars)."""
+def notify(title: str, findings: Iterable[Finding] = (), text: str | None = None) -> None:
+    """Log everything; send ntfy/Discord the phone-sized version (MAX_LINES, Discord's 2,000 characters)."""
+    findings = list(findings)
     print(f"== {title}\n{text or render(findings)}\n", flush=True)
     if NTFY_URL:
-        post("ntfy", NTFY_URL, (text or render(findings, MAX_LINES)).encode(), {"Title": title})
+        post("ntfy", NTFY_URL, (text or render(findings, max_lines=MAX_LINES)).encode(), {"Title": title})
     if DISCORD_WEBHOOK:
         post("Discord", DISCORD_WEBHOOK, discord_payload(title, findings, text), {"Content-Type": "application/json"})
 
 
-def discord_payload(title, findings=(), text=None):
-    """At most Discord's 2,000 characters, and no mentions: a name such as "@everyone" in the guides or the
-    config is shown as text and never pings anyone."""
+def discord_payload(title: str, findings: Iterable[Finding] = (), text: str | None = None) -> bytes:
+    """Build a Discord message: at most 2,000 characters, and no mentions.
+
+    A name such as "@everyone" in the guides or the config is shown as text and never pings anyone.
+    """
     head = f"**{one_line(title)}**\n"
-    body = text or render(findings, MAX_LINES, 2000 - len(head), bold=True)
-    return json.dumps({"content": (head + body)[:2000], "allowed_mentions": {"parse": []}}).encode()
+    body = text or render(findings, max_lines=MAX_LINES, max_chars=DISCORD_LIMIT - len(head), bold=True)
+    return json.dumps({"content": (head + body)[:DISCORD_LIMIT], "allowed_mentions": {"parse": []}}).encode()
 
 
-def yaml_scalar(value):
-    """A string as a YAML scalar that loads back as exactly that string: plain when that round-trips,
-    otherwise double-quoted by PyYAML's own emitter."""
+def yaml_scalar(value: str) -> str:
+    """Return a string as a YAML scalar that loads back as exactly that string.
+
+    Plain when that round-trips, otherwise double-quoted by PyYAML's own emitter.
+    """
     try:
         if yaml.safe_load(f"k: {value}") == {"k": value}:
             return value
@@ -450,14 +521,17 @@ def yaml_scalar(value):
     return yaml.safe_dump(value, default_style='"', allow_unicode=True, width=float("inf")).rstrip("\n")
 
 
-def render_suggestions(gaps, commit):
-    """Recyclarr custom_formats blocks for the gaps, one per profile and guide score, indented to paste
-    under an instance's custom_formats: list. Text only; the caller prints it."""
+def render_suggestions(gaps: Iterable[Block], commit: str) -> str:
+    """Render Recyclarr custom_formats blocks for the gaps, one per profile and guide score.
+
+    Indented to paste under an instance's custom_formats: list. Text only; the caller prints it.
+    """
     out = [
         one_line(f"# trash-watch --suggest @ TRaSH Guides {commit}. Nothing has been written to your config."),
         "# Review each block, paste it into that instance's custom_formats: list, then run",
         "# `recyclarr sync --preview` before `recyclarr sync`.",
     ]
+    gaps = list(gaps)
     if not gaps:
         return "\n".join([*out, "#", "# Nothing to suggest: every checked profile scores all its guide CFs."])
     profiles = {}
@@ -484,31 +558,56 @@ def render_suggestions(gaps, commit):
     return "\n".join(out)
 
 
-def suggest():
-    """--suggest: print paste-ready blocks for every missing or unscored guide CF. Prints only: no state,
-    no notifications, and the config stays read-only."""
+def suggest() -> None:
+    """Print paste-ready blocks for every missing or unscored guide CF (--suggest).
+
+    Prints only: no state, no notifications, and the config stays read-only.
+    """
     commit = sync_guides()
     guides = load_guides()
     warnings, gaps = [], []
-    for app, inst, cfs, qps in load_instances(warnings):
-        check(app, inst, cfs, qps, guides, gaps)
+    for instance in load_instances(warnings):
+        check(instance, guides, gaps)
     print(render_suggestions(gaps, commit), flush=True)
     for w in warnings:
         print(f"# warning: {w}", flush=True)
 
 
-def run_once():
+def upstream_changes(
+    used: dict[str, dict[str, set[str]]], guides: Guides, old_fp: dict[str, str]
+) -> tuple[dict[str, str], list[Finding]]:
+    """Fingerprint the CFs, profiles and CF groups in use; report those that changed since the last run."""
+    fp = {}
+    for app, u in used.items():
+        for tid in u["cf"] & guides[app]["cf"].keys():
+            fp[f"{app}:cf:{tid}"] = cf_fingerprint(guides[app]["cf"][tid], u["sets"])
+        for tid in u["qp"]:
+            fp[f"{app}:qp:{tid}"] = qp_fingerprint(guides[app]["qp"][tid])
+        for tid in u["groups"]:
+            fp[f"{app}:groups:{tid}"] = qp_fingerprint(guides[app]["groups"][tid])
+    changes = []
+    for key, h in fp.items():
+        if key in old_fp and old_fp[key] != h:
+            app, kind, tid = key.split(":")
+            label = {"cf": "CF", "qp": "Profile", "groups": "CF group"}[kind]
+            changes.append((f"{app} · changed upstream", f"{label} {guides[app][kind][tid]['name']}"))
+    return fp, changes
+
+
+def run_once() -> None:
+    """Run one check: sync the guides, check every instance, notify if the findings changed, save state."""
     commit = sync_guides()
     guides = load_guides()
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
     old_fp = state.get("fingerprints", {}) if state.get("version") == STATE_VERSION else {}
     if state and state.get("version") != STATE_VERSION:
         print("Fingerprint format changed: re-baselining, so no upstream changes are reported this run", flush=True)
-    findings, fp, warnings = [], {}, []
+    findings, warnings = [], []
     used = {app: {"cf": set(), "qp": set(), "sets": set(), "groups": set()} for app in APPS}
 
-    for app, inst, cfs, qps in load_instances(warnings):
-        f, used_cfs, used_qps, score_sets, coverage, used_groups = check(app, inst, cfs, qps, guides)
+    for instance in load_instances(warnings):
+        app = instance[0]
+        f, used_cfs, used_qps, score_sets, coverage, used_groups = check(instance, guides)
         findings += f
         used[app]["cf"] |= used_cfs
         used[app]["qp"] |= used_qps
@@ -518,20 +617,8 @@ def run_once():
     for w in warnings:
         print(f"warning: {w}", flush=True)
 
-    for app, u in used.items():
-        for tid in u["cf"] & guides[app]["cf"].keys():
-            fp[f"{app}:cf:{tid}"] = cf_fingerprint(guides[app]["cf"][tid], u["sets"])
-        for tid in u["qp"]:
-            fp[f"{app}:qp:{tid}"] = qp_fingerprint(guides[app]["qp"][tid])
-        for tid in u["groups"]:
-            fp[f"{app}:groups:{tid}"] = qp_fingerprint(guides[app]["groups"][tid])
-
-    for key, h in fp.items():
-        if key in old_fp and old_fp[key] != h:
-            app, kind, tid = key.split(":")
-            name = guides[app][kind][tid]["name"]
-            label = {"cf": "CF", "qp": "Profile", "groups": "CF group"}[kind]
-            findings.append((f"{app} · changed upstream", f"{label} {name}"))
+    fp, changes = upstream_changes(used, guides, old_fp)
+    findings += changes
 
     report = render(findings)
     if not findings:
@@ -555,10 +642,12 @@ def run_once():
     )
 
 
-def health(now=None):
-    """Healthy when the last successful check finished within two intervals (plus ten minutes for the check
-    itself): `--health`, used by the image's HEALTHCHECK, so monitoring notices a watcher that stopped
-    checking, whether it crashed, hangs, or every check fails (a failed check doesn't update state.json)."""
+def health(now: float | None = None) -> tuple[bool, str]:
+    """Say whether the last successful check finished within two intervals (plus ten minutes).
+
+    `--health`, used by the image's HEALTHCHECK, so monitoring notices a watcher that stopped checking,
+    whether it crashed, hangs, or every check fails (a failed check doesn't update state.json).
+    """
     try:
         # UTC; states written before 0.2 have no "Z", but the container clock they came from was UTC too
         stamp = json.loads(STATE.read_text())["checked"].rstrip("Z")
@@ -572,7 +661,8 @@ def health(now=None):
     return True, f"healthy: last completed check {age / 3600:.1f} h ago"
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
+    """Run the command line; return the exit code."""
     parser = argparse.ArgumentParser(description="Check a Recyclarr config against the TRaSH Guides.")
     parser.add_argument(
         "--suggest",

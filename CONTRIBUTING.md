@@ -70,11 +70,11 @@ The workflow, Dockerfile and secret scanners run in containers; the exact comman
 
 ## Coding standards
 
-- **Python** (`trash_watch.py`, `tests/`): [PEP 8](https://peps.python.org/pep-0008/), enforced by
-  [ruff](https://docs.astral.sh/ruff/) (pyflakes, pycodestyle, bugbear, the bandit security rules, pylint's
-  errors and warnings, and the simplification and modernisation families; the list is in
-  [`pyproject.toml`](pyproject.toml)) and formatted with `ruff format`. YAML is always loaded with a safe
-  loader, never `yaml.load` with the full loader.
+- **Python** (`trash_watch.py`, `tests/`, `fuzz/`): [PEP 8](https://peps.python.org/pep-0008/) and
+  [PEP 257](https://peps.python.org/pep-0257/), enforced by [ruff](https://docs.astral.sh/ruff/) with every rule
+  family enabled, including type annotations, docstrings and the bandit security rules, and `ruff format`; the
+  few rules left out, and why, are in [`pyproject.toml`](pyproject.toml). Everything is type-annotated. YAML is
+  always loaded with a safe loader, never `yaml.load` with the full loader.
 - **YAML** (compose file, workflows, templates): [yamllint](https://yamllint.readthedocs.io/) with
   [`.yamllint.yml`](.yamllint.yml), warnings treated as errors.
 - **GitHub Actions workflows**: [actionlint](https://github.com/rhysd/actionlint), which also runs

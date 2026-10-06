@@ -19,7 +19,6 @@ first release: a signed multi-arch image on GHCR with an SBOM and provenance.
 
 **Releases and security**
 
-- Type annotations throughout, and ruff's full rule set.
 
 **Security and project health**
 

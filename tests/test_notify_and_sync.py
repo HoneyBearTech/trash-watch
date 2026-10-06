@@ -4,6 +4,8 @@ import json
 import os
 import subprocess
 import urllib.request
+from pathlib import Path
+from typing import Any
 
 import pytest
 from conftest import REAL_SYNC_GUIDES
@@ -11,12 +13,12 @@ from conftest import REAL_SYNC_GUIDES
 import trash_watch as tw
 
 
-def many_findings():
+def many_findings() -> list[tw.Finding]:
     out = [(f"radarr/movies · Profile {p}", f"missing CF {p}{i}") for p in "ABCDEF" for i in range(5)]
     return [*out, ("radarr · changed upstream", "CF Remaster")]
 
 
-def test_notification_is_capped_for_a_phone():
+def test_notification_is_capped_for_a_phone() -> None:
     text = tw.render(many_findings(), max_lines=tw.MAX_LINES, max_chars=2000, bold=True)
     lines = text.splitlines()
     assert len(lines) <= tw.MAX_LINES
@@ -28,28 +30,31 @@ def test_notification_is_capped_for_a_phone():
     assert lines[-1] == "…plus 16 more (full list: docker logs trash-watch)"
 
 
-def test_log_gets_everything_with_upstream_changes_last():
+def test_log_gets_everything_with_upstream_changes_last() -> None:
     lines = tw.render(many_findings()).splitlines()
     assert len(lines) == 6 * 6 + 2
     assert lines[-2:] == ["radarr · changed upstream", "• CF Remaster"]
 
 
 @pytest.fixture
-def sent(monkeypatch):
+def sent(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any, bytes]]:
     """Records each HTTP request instead of sending it; ntfy's fails, to show Discord still goes out."""
     requests = []
 
-    def fake_urlopen(request, timeout):
+    def fake_urlopen(request: urllib.request.Request, timeout: float) -> None:
         requests.append((request.full_url, request.headers, request.data))
         if "ntfy" in request.full_url:
-            raise OSError("ntfy is down")
+            msg = "ntfy is down"
+            raise OSError(msg)
         assert timeout == 15
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     return requests
 
 
-def test_each_notifier_is_sent_separately(sent, monkeypatch, capsys):
+def test_each_notifier_is_sent_separately(
+    sent: list[tuple[str, Any, bytes]], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(tw, "NTFY_URL", "https://ntfy.example/topic")
     monkeypatch.setattr(tw, "DISCORD_WEBHOOK", "https://discord.example/api/webhooks/1/x")
     tw.notify("3 item(s)", many_findings()[:3])
@@ -61,7 +66,9 @@ def test_each_notifier_is_sent_separately(sent, monkeypatch, capsys):
     assert "notify via ntfy failed: ntfy is down" in capsys.readouterr().out
 
 
-def test_non_http_notifier_urls_are_refused(sent, monkeypatch, capsys):
+def test_non_http_notifier_urls_are_refused(
+    sent: list[tuple[str, Any, bytes]], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(tw, "NTFY_URL", "file:///etc/passwd")
     monkeypatch.setattr(tw, "DISCORD_WEBHOOK", None)
     tw.notify("x", text="y")
@@ -69,7 +76,7 @@ def test_non_http_notifier_urls_are_refused(sent, monkeypatch, capsys):
     assert "notify via ntfy skipped: the URL must start with https:// or http://" in capsys.readouterr().out
 
 
-def git(cwd, *args):
+def git(cwd: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", *args],
         cwd=cwd,
@@ -79,7 +86,9 @@ def git(cwd, *args):
     ).stdout.strip()
 
 
-def test_sync_guides_clones_only_the_json_then_follows_upstream(tmp_path, monkeypatch):
+def test_sync_guides_clones_only_the_json_then_follows_upstream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     upstream = tmp_path / "upstream"
     (upstream / "docs/json/radarr/cf").mkdir(parents=True)
     (upstream / "docs/json/radarr/cf/a.json").write_text("{}")
@@ -107,7 +116,7 @@ def test_sync_guides_clones_only_the_json_then_follows_upstream(tmp_path, monkey
 
 
 @pytest.mark.skipif(os.getuid() == 0, reason="root can write anywhere")
-def test_unwritable_data_dir_fails_early_with_the_fix(workspace):
+def test_unwritable_data_dir_fails_early_with_the_fix(workspace: Path) -> None:
     data = workspace / "data"
     data.chmod(0o500)  # like a data/ left root-owned by an older, root-running image
     try:

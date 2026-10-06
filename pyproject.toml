@@ -6,19 +6,30 @@ line-length = 120
 target-version = "py314"
 
 [tool.ruff.lint]
-# pyflakes/pycodestyle, bugbear, the bandit security rules (S), pylint errors and warnings, and the
-# simplification, import and modernisation families. Exceptions are made per line, with a reason.
-select = [
-    "A", "ARG", "B", "BLE", "C4", "E", "F", "I", "ISC", "N", "PERF", "PIE", "PLE", "PLW", "PT", "RET", "RUF",
-    "S", "SIM", "UP", "W",
+# Every rule family, minus the few that conflict with the formatter or each other (as in the maintainer's
+# other projects). Exceptions in the code are made per line, with a reason.
+select = ["ALL"]
+ignore = [
+    "COM812", # conflicts with ruff format
+    "CPY001", # no per-file copyright headers; the license is in LICENSE
+    "D203",   # conflicts with D211 (no blank line before a class docstring)
+    "D213",   # conflicts with D212 (summary on the first docstring line)
+    "T201",   # print() is how trash-watch reports: the container log is its output
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
-    "S101", # pytest uses assert
-    "S603", # the fixtures run git on throwaway repositories
+    "D",       # test names say what they test
+    "INP001",  # tests/ is not a package
+    "PLR2004", # expected values are written inline
+    "S101",    # pytest uses assert
+    "S603",    # the fixtures run git on throwaway repositories
     "S607",
+    "TC001",   # pytest and Hypothesis inspect test signatures at runtime, so annotation imports stay real
+    "TC002",
+    "TC003",
 ]
+"fuzz/**" = ["INP001"] # fuzz/ holds a standalone harness, not a package
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

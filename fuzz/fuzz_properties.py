@@ -1,5 +1,6 @@
-"""Coverage-guided fuzzing (Atheris) of the Hypothesis properties in tests/test_properties.py: libFuzzer feeds
-each property's `.hypothesis.fuzz_one_input`, so a fuzzer finding is a failing property.
+"""Coverage-guided fuzzing (Atheris) of the Hypothesis properties in tests/test_properties.py.
+
+libFuzzer feeds each property's `.hypothesis.fuzz_one_input`, so a fuzzer finding is a failing property.
 
 Atheris only has Linux x86_64 wheels, so this runs in CI (.github/workflows/fuzz.yml) or an amd64 container:
 
@@ -33,14 +34,15 @@ TARGETS = {
 }
 
 
-def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in TARGETS:
+def main() -> None:
+    """Fuzz the target named on the command line; libFuzzer takes the remaining arguments."""
+    if sys.argv[1:2] == [] or sys.argv[1] not in TARGETS:
         sys.exit(f"usage: {sys.argv[0]} <target> [libFuzzer flags]\ntargets: {', '.join(TARGETS)}")
     target = sys.argv.pop(1)
 
     # PyYAML is guidance too: with only trash_watch instrumented, the fuzzer can't tell one document from another.
     with atheris.instrument_imports(include=["trash_watch", "yaml"]):
-        import test_properties  # imported inside the block so it gets instrumented
+        import test_properties  # noqa: PLC0415 - imported inside the block so it gets instrumented
 
     prop = getattr(test_properties, TARGETS[target])
     atheris.Setup(sys.argv, prop.hypothesis.fuzz_one_input)
