@@ -8,7 +8,17 @@ services:
     container_name: trash-watch
     restart: unless-stopped
     env_file: .env    # settings + secrets, never committed; template: .env.example
+    # Unprivileged, on a read-only root filesystem, with no Linux capabilities and no way to gain any.
+    # The uid/gid must own ./data on the host (see docs/installing.md).
+    user: "${TRASH_WATCH_UID:-1000}:${TRASH_WATCH_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     volumes:
       # Recyclarr's app-data dir (the same dir Recyclarr mounts as /config). Always read-only.
       - ${RECYCLARR_CONFIG_PATH:?set RECYCLARR_CONFIG_PATH in .env}:/config:ro
-      - ./data:/data    # guides cache + state
+      - ./data:/data    # guides cache + state; owned by TRASH_WATCH_UID
