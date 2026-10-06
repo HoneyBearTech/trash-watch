@@ -17,7 +17,7 @@ and passes every line into the container.
 | `PROFILE_MAP` | `{}` | JSON object (one line, single-quoted) mapping your profile name to a guide quality profile's `trash_id` or exact name, e.g. `'{"Movies 4K": "<trash_id>"}'`. |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names to skip on purpose, e.g. `dc98083864ea246d05a42df0d05f81cc,My Profile`. No quotes, no comment on the same line. |
 | `RUN_ONCE` | unset | `1` = one check, then exit: exit code 0 if it completed, 1 if it failed (after the error notification). Pass with `docker compose run -e RUN_ONCE=1`; never put it in `.env`. |
-| `TRASH_WATCH_IMAGE` | `trash-watch:local` | Compose only: the image to run. Leave unset to build from the checkout, or set a release such as `ghcr.io/honeybeartech/trash-watch:0.1.1` ([verifying-releases.md](verifying-releases.md)). |
+| `TRASH_WATCH_IMAGE` | `trash-watch:local` | Compose only: the image to run. Leave unset to build from the checkout, or set a release such as `ghcr.io/honeybeartech/trash-watch:0.2.0` ([verifying-releases.md](verifying-releases.md)). |
 | `TRASH_WATCH_UID` / `TRASH_WATCH_GID` | `1000` | Compose only: the user and group the container runs as. They must own `./data` on the host. |
 | `TRASH_WATCH_PULL_POLICY` | `build` | Compose only: `build` builds from the checkout on every start; `always` pulls `TRASH_WATCH_IMAGE` instead. |
 
@@ -69,5 +69,5 @@ hash-pinned [`requirements.txt`](../requirements.txt) (pip is removed afterwards
 `trash_watch.py` and `LICENSE` in `/app`; it runs `python -u trash_watch.py` as the unprivileged user `trash-watch`
 (uid/gid 1000). By default compose builds it
 from the checkout. Releases publish it for linux/amd64 and linux/arm64 as `ghcr.io/honeybeartech/trash-watch`,
-tagged with the version (`0.1.1`), major.minor (`0.1`) and `latest`, signed and with an SBOM and provenance
+tagged with the version (`0.2.0`), major.minor (`0.2`) and `latest`, signed and with an SBOM and provenance
 ([verifying-releases.md](verifying-releases.md)).

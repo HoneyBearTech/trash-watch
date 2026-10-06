@@ -6,6 +6,10 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-06
+
+Health monitoring, Recyclarr v8 CF groups, and in-toto provenance for releases.
+
 ### Added
 
 - `HEARTBEAT_URL`: pinged after every completed check, for a dead man's switch such as an Uptime Kuma Push
@@ -19,10 +23,16 @@ All notable changes to trash-watch are documented here. The format follows
   unhealthy when no check has completed for two intervals, so monitoring notices a watcher that crashed, hangs
   or keeps failing.
 
+- Releases also carry their SLSA provenance as in-toto JSON Lines (`trash-watch-<version>.intoto.jsonl`).
+
 ### Changed
 
 - A one-time check (`RUN_ONCE=1`) exits with code 1 when it fails, so it can be scripted.
 - `state.json` records the time of the last completed check in UTC (with a trailing `Z`).
+
+### Upgrading
+
+- No steps needed. Existing `state.json` files are read as before; set `HEARTBEAT_URL` to use the new heartbeat.
 
 ## [0.1.1] - 2026-10-06
 
@@ -103,6 +113,7 @@ The first release.
   `docker run --rm -v "$PWD/data:/data" busybox chown -R 1000:1000 /data` ([docs/upgrading.md](docs/upgrading.md)).
   Without it, trash-watch stops with an error that names this command.
 
-[Unreleased]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/HoneyBearTech/trash-watch/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/HoneyBearTech/trash-watch/releases/tag/v0.1.0
