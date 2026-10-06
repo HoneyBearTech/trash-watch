@@ -44,6 +44,8 @@ INTERVAL = int(float(os.getenv("INTERVAL_HOURS", "24")) * 3600)
 RUN_ONCE = os.getenv("RUN_ONCE") == "1"
 NTFY_URL = os.getenv("NTFY_URL")
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
+# Optional: pinged after every completed check (Uptime Kuma Push monitor, healthchecks.io, ...)
+HEARTBEAT_URL = os.getenv("HEARTBEAT_URL")
 # Optional: {"My 4K Profile": "<guide quality-profile trash_id or name>"} for renamed profiles
 PROFILE_MAP = json.loads(os.getenv("PROFILE_MAP") or "{}")
 # Optional: comma-separated trash_ids (CFs or guide profiles) and profile names you skip on purpose
@@ -476,16 +478,35 @@ def render(
     return "\n".join(lines)
 
 
-def post(name: str, url: str, data: bytes, headers: dict[str, str]) -> None:
-    """POST a notification; log failures instead of raising, so one target can't stop the other or the loop."""
-    if not url.lower().startswith(("https://", "http://")):  # no file: or other schemes from a typo'd .env
-        print(f"notify via {name} skipped: the URL must start with https:// or http://", flush=True)
+def send(label: str, url: str, data: bytes | None, headers: dict[str, str]) -> None:
+    """Request a URL (POST with data, GET without); log failures instead of raising.
+
+    So one target can't stop another or the loop. Only http(s) URLs are opened: no file: or other schemes
+    from a typo'd .env.
+    """
+    if not url.lower().startswith(("https://", "http://")):
+        print(f"{label} skipped: the URL must start with https:// or http://", flush=True)
         return
     request = urllib.request.Request(url, data=data, headers={"User-Agent": "trash-watch/1.0", **headers})  # noqa: S310 - scheme checked above
     try:
         urllib.request.urlopen(request, timeout=15)  # noqa: S310 - scheme checked above
-    except Exception as e:  # noqa: BLE001 - never let a notify failure kill the loop, or skip the other target
-        print(f"notify via {name} failed: {e}", flush=True)
+    except Exception as e:  # noqa: BLE001 - never let a failed request kill the loop, or skip the next target
+        print(f"{label} failed: {e}", flush=True)
+
+
+def post(name: str, url: str, data: bytes, headers: dict[str, str]) -> None:
+    """POST a notification to one target."""
+    send(f"notify via {name}", url, data, headers)
+
+
+def heartbeat() -> None:
+    """Ping HEARTBEAT_URL after a completed check, if it's set.
+
+    A dead man's switch for a monitor such as an Uptime Kuma Push monitor or healthchecks.io: the pings stop
+    when trash-watch crashes, hangs or keeps failing, and the monitor alerts.
+    """
+    if HEARTBEAT_URL:
+        send("heartbeat", HEARTBEAT_URL, None, {})
 
 
 def notify(title: str, findings: Iterable[Finding] = (), text: str | None = None) -> None:
@@ -595,7 +616,7 @@ def upstream_changes(
 
 
 def run_once() -> None:
-    """Run one check: sync the guides, check every instance, notify if the findings changed, save state."""
+    """Run one check: sync the guides, check every instance, notify if the findings changed, save state, ping."""
     commit = sync_guides()
     guides = load_guides()
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
@@ -640,6 +661,7 @@ def run_once() -> None:
             indent=2,
         )
     )
+    heartbeat()  # only after a check that completed and saved its state
 
 
 def health(now: float | None = None) -> tuple[bool, str]:

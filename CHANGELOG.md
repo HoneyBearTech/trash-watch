@@ -8,6 +8,8 @@ All notable changes to trash-watch are documented here. The format follows
 
 ### Added
 
+- `HEARTBEAT_URL`: pinged after every completed check, for a dead man's switch such as an Uptime Kuma Push
+  monitor or healthchecks.io, so you're alerted when trash-watch stops checking (docs/user-guide).
 - Recyclarr v8 `custom_format_groups` are understood instead of warned about: the CFs a group adds count as
   scored in the profiles it's assigned to (Recyclarr's rules: required, defaults minus `exclude`, `select` or
   `select_all`; `assign_scores_to`, or the guide-backed profiles it's meant for; default groups unless

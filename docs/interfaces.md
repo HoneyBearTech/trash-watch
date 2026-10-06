@@ -13,6 +13,7 @@ and passes every line into the container.
 | `INTERVAL_HOURS` | `24` | Hours between checks. Decimals allowed. |
 | `NTFY_URL` | unset | Full ntfy topic URL. The report is POSTed as the body with a `Title` header. **Secret.** |
 | `DISCORD_WEBHOOK` | unset | Discord webhook URL. **Secret.** |
+| `HEARTBEAT_URL` | unset | Requested (GET, 15 s timeout) after every check that completed and saved its state; never after a failed one. For a dead man's switch: an Uptime Kuma Push monitor, healthchecks.io and the like. Only `http(s)://`. **Secret** (it carries a token). |
 | `PROFILE_MAP` | `{}` | JSON object (one line, single-quoted) mapping your profile name to a guide quality profile's `trash_id` or exact name, e.g. `'{"Movies 4K": "<trash_id>"}'`. |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names to skip on purpose, e.g. `dc98083864ea246d05a42df0d05f81cc,My Profile`. No quotes, no comment on the same line. |
 | `RUN_ONCE` | unset | `1` = one check, then exit: exit code 0 if it completed, 1 if it failed (after the error notification). Pass with `docker compose run -e RUN_ONCE=1`; never put it in `.env`. |
@@ -41,6 +42,7 @@ that names the fix ([upgrading.md](upgrading.md#from-a-root-running-version-befo
 | `https://github.com/TRaSH-Guides/Guides.git` | every run | `git clone` (first run), then `git fetch --depth 1`. No credentials. |
 | `NTFY_URL` | findings changed, or a run failed | HTTP POST, 15 s timeout, `User-Agent: trash-watch/1.0` |
 | `DISCORD_WEBHOOK` | same | HTTP POST of `{"content": ...}`, 15 s timeout |
+| `HEARTBEAT_URL` | after every completed check | HTTP GET, 15 s timeout; a failure is logged and changes nothing else |
 
 Both get the phone-sized message described in [How it works](architecture.md#when-youre-notified). A
 failed notification is logged as `notify via <target> failed: ...` and doesn't stop the loop or the

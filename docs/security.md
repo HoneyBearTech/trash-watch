@@ -14,7 +14,8 @@ URLs that can post to your phone or Discord. These are the rules it keeps.
 
 ## Secrets live in `.env`
 
-- `NTFY_URL` and `DISCORD_WEBHOOK` let anyone who has them post to your topic or channel. Keep them in
+- `NTFY_URL`, `DISCORD_WEBHOOK` and `HEARTBEAT_URL` are secrets: the first two let anyone who has them post to
+  your topic or channel, and the heartbeat URL lets them fake "still checking". Keep them in
   `.env`, which is gitignored and should be `chmod 600`. Only `.env.example`, with placeholders, is
   committed.
 - If one leaks: delete and recreate the Discord webhook (or move to a new ntfy topic, or add ntfy access
@@ -26,7 +27,8 @@ URLs that can post to your phone or Discord. These are the rules it keeps.
 ## What it can reach
 
 - It opens no ports.
-- Outbound: GitHub over HTTPS (public guides repo, no token), plus your ntfy and Discord URLs. It refuses
+- Outbound: GitHub over HTTPS (public guides repo, no token), plus your ntfy, Discord and heartbeat URLs (the
+  heartbeat is a bare GET with no data). It refuses
   notifier URLs that don't start with `https://` or `http://`. Notifications contain only custom-format and
   profile names, `trash_id`s, scores and instance names from your config.
 - It runs as an unprivileged user (uid 1000 by default) on a read-only root filesystem, with all Linux
