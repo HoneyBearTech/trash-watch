@@ -4,8 +4,12 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from hypothesis import settings
 
 import trash_watch as tw
+
+# pytest --hypothesis-profile=thorough runs 5,000 examples per property instead of 100.
+settings.register_profile("thorough", max_examples=5000, deadline=None)
 
 REAL_SYNC_GUIDES = tw.sync_guides  # conftest stubs it per test; test_sync_guides uses the real one
 FIXTURES = Path(__file__).parent / "fixtures"

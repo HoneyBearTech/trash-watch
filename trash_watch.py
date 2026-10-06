@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -53,6 +54,9 @@ KNOWN_KEYS = {
     "media_management",
 }
 STATE_VERSION = 2  # bump when fingerprints change shape: the next run re-baselines instead of alerting
+# Line breaks and other control characters (C0, DEL, C1, Unicode line/paragraph separators), plus what YAML
+# refuses anywhere in a document (lone surrogates, U+FFFE, U+FFFF)
+CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff\ufffe\uffff]+")
 MAX_LINES = 20  # notification body cap, so it reads on a phone; the log always gets everything
 PER_GROUP = 3  # items shown per profile in a notification, so one busy profile can't hide the rest
 
@@ -77,9 +81,27 @@ def git(*args, cwd=None):
     return result.stdout.strip()
 
 
-def sync_guides():
-    if not (CACHE / ".git").exists():
+def check_data_writable():
+    """Fail early, with the fix, when the data directory belongs to another user (for example root-owned
+    from an older, root-running image, or created by Docker before the first start)."""
+    try:
         DATA.mkdir(parents=True, exist_ok=True)
+        probe = DATA / ".write-test"
+        probe.touch()
+        probe.unlink()
+    except OSError as e:
+        uid, gid = os.getuid(), os.getgid()
+        msg = (
+            f"{DATA} isn't writable by this container's user ({uid}:{gid}). Fix it once on the host, in the "
+            f'trash-watch directory: docker run --rm -v "$PWD/data:/data" busybox chown -R {uid}:{gid} /data '
+            "(see docs/upgrading.md)"
+        )
+        raise PermissionError(msg) from e
+
+
+def sync_guides():
+    check_data_writable()
+    if not (CACHE / ".git").exists():
         clone = ("clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse", GUIDES_REPO, str(CACHE))
         git(*clone, cwd=DATA)
         git("sparse-checkout", "set", "docs/json")
@@ -183,9 +205,17 @@ def match_guide_profile(qp, guide_qps):
 
 
 def guide_score(cf, score_set):
-    """The guide's score for a CF in a score set, falling back to its default (None if it has neither)."""
+    """The guide's score for a CF in a score set, falling back to its default. None if it has neither, or if
+    the guide's value isn't an integer (it ends up in notifications and in YAML the operator pastes)."""
     scores = (cf or {}).get("trash_scores", {})
-    return scores.get(score_set, scores.get("default"))
+    score = scores.get(score_set, scores.get("default")) if isinstance(scores, dict) else None
+    return score if isinstance(score, int) and not isinstance(score, bool) else None
+
+
+def one_line(text):
+    """Text from the guides or the config as a single line: line breaks and other control characters
+    become spaces, so a name can't add lines to a notification or to YAML the operator pastes."""
+    return CONTROL_CHARS.sub(" ", str(text))
 
 
 def check(app, inst, cfs, qps, guides, gaps=None):
@@ -295,7 +325,7 @@ def render(findings, max_lines=None, max_chars=None, bold=False):
     upstream changes last. With max_lines (a notification), each group shows PER_GROUP items,
     whole groups are added while they fit, and a 'plus N more' footer covers the rest."""
     groups = {}
-    for group, item in sorted(set(findings)):
+    for group, item in sorted({(one_line(g), one_line(i)) for g, i in findings}):
         groups.setdefault(group, []).append(item)
     order = sorted(groups, key=lambda g: (g.endswith("changed upstream"), g))
     lines = []
@@ -333,31 +363,33 @@ def notify(title, findings=(), text=None):
     if NTFY_URL:
         post("ntfy", NTFY_URL, (text or render(findings, MAX_LINES)).encode(), {"Title": title})
     if DISCORD_WEBHOOK:
-        head = f"**{title}**\n"
-        body = text or render(findings, MAX_LINES, 2000 - len(head), bold=True)
-        post(
-            "Discord",
-            DISCORD_WEBHOOK,
-            json.dumps({"content": (head + body)[:2000]}).encode(),
-            {"Content-Type": "application/json"},
-        )
+        post("Discord", DISCORD_WEBHOOK, discord_payload(title, findings, text), {"Content-Type": "application/json"})
+
+
+def discord_payload(title, findings=(), text=None):
+    """At most Discord's 2,000 characters, and no mentions: a name such as "@everyone" in the guides or the
+    config is shown as text and never pings anyone."""
+    head = f"**{one_line(title)}**\n"
+    body = text or render(findings, MAX_LINES, 2000 - len(head), bold=True)
+    return json.dumps({"content": (head + body)[:2000], "allowed_mentions": {"parse": []}}).encode()
 
 
 def yaml_scalar(value):
-    """A profile name as YAML: plain when that round-trips, otherwise double-quoted."""
+    """A string as a YAML scalar that loads back as exactly that string: plain when that round-trips,
+    otherwise double-quoted by PyYAML's own emitter."""
     try:
         if yaml.safe_load(f"k: {value}") == {"k": value}:
             return value
     except yaml.YAMLError:
         pass
-    return json.dumps(value)
+    return yaml.safe_dump(value, default_style='"', allow_unicode=True, width=float("inf")).rstrip("\n")
 
 
 def render_suggestions(gaps, commit):
     """Recyclarr custom_formats blocks for the gaps, one per profile and guide score, indented to paste
     under an instance's custom_formats: list. Text only; the caller prints it."""
     out = [
-        f"# trash-watch --suggest @ TRaSH Guides {commit}. Nothing has been written to your config.",
+        one_line(f"# trash-watch --suggest @ TRaSH Guides {commit}. Nothing has been written to your config."),
         "# Review each block, paste it into that instance's custom_formats: list, then run",
         "# `recyclarr sync --preview` before `recyclarr sync`.",
     ]
@@ -370,8 +402,8 @@ def render_suggestions(gaps, commit):
         first = items[0]
         out += [
             "",
-            f"# {app}/{inst} · {profile} (guide: {first['guide']}, score_set {first['score_set']})",
-            f"# paste under:  {app}: > {inst}: > custom_formats:",
+            one_line(f"# {app}/{inst} · {profile} (guide: {first['guide']}, score_set {first['score_set']})"),
+            one_line(f"# paste under:  {app}: > {inst}: > custom_formats:"),
         ]
         by_score = {}
         for gap in items:
@@ -380,9 +412,9 @@ def render_suggestions(gaps, commit):
             out.append("      - trash_ids:")
             for gap in block:
                 note = " (already synced, not scored in this profile)" if gap["synced"] else ""
-                out.append(f"          - {gap['trash_id']} # {gap['cf']}{note}")
-            out += ["        assign_scores_to:", f"          - name: {yaml_scalar(profile)}"]
-            if score is not None:  # without a score, Recyclarr uses the guide's (or 0)
+                out.append(f"          - {yaml_scalar(str(gap['trash_id']))} # {one_line(gap['cf'])}{note}")
+            out += ["        assign_scores_to:", f"          - name: {yaml_scalar(str(profile))}"]
+            if score is not None:  # without a score, Recyclarr uses the guide's (or 0); guide_score() is int-only
                 out.append(f"            score: {score}")
     return "\n".join(out)
 

@@ -1,6 +1,7 @@
 """Phone-sized notifications, sending to each target, and syncing the guides clone (from a local git repo)."""
 
 import json
+import os
 import subprocess
 import urllib.request
 
@@ -103,3 +104,14 @@ def test_sync_guides_clones_only_the_json_then_follows_upstream(tmp_path, monkey
     assert second != first
     assert second == git(upstream, "rev-parse", "--short", "HEAD")
     assert (tmp_path / "sync-data/guides/docs/json/radarr/cf/b.json").exists()
+
+
+@pytest.mark.skipif(os.getuid() == 0, reason="root can write anywhere")
+def test_unwritable_data_dir_fails_early_with_the_fix(workspace):
+    data = workspace / "data"
+    data.chmod(0o500)  # like a data/ left root-owned by an older, root-running image
+    try:
+        with pytest.raises(PermissionError, match=r"isn't writable by this container's user .* chown -R \d+:\d+ /data"):
+            tw.check_data_writable()
+    finally:
+        data.chmod(0o700)

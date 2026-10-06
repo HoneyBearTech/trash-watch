@@ -17,6 +17,7 @@ and passes every line into the container.
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names to skip on purpose, e.g. `dc98083864ea246d05a42df0d05f81cc,My Profile`. No quotes, no comment on the same line. |
 | `RUN_ONCE` | unset | `1` = one check, then exit. Pass with `docker compose run -e RUN_ONCE=1`; never put it in `.env`. |
 | `TRASH_WATCH_IMAGE` | `trash-watch:local` | Compose only: the image to run. Leave unset to build from the checkout, or set a release such as `ghcr.io/honeybeartech/trash-watch:0.1.0` ([verifying-releases.md](verifying-releases.md)). |
+| `TRASH_WATCH_UID` / `TRASH_WATCH_GID` | `1000` | Compose only: the user and group the container runs as. They must own `./data` on the host. |
 | `TRASH_WATCH_PULL_POLICY` | `build` | Compose only: `build` builds from the checkout on every start; `always` pulls `TRASH_WATCH_IMAGE` instead. |
 
 The script also reads `DATA_DIR` (default `/data`) and `CONFIG_ROOT` (default `/config`). They're the
@@ -29,7 +30,9 @@ container-side paths the compose mounts use, so don't set them in `.env`.
 | `/config` | `${RECYCLARR_CONFIG_PATH}` | **read-only** | `recyclarr.yml` / `recyclarr.yaml`, `configs/*.yml`, `includes/`, and for `template:` includes `repositories/config-templates/includes.json` (or `resources/config-templates/git/official/`) plus the files it names |
 | `/data` | `./data` (gitignored) | read-write | `guides/`: sparse clone of `TRaSH-Guides/Guides` (`docs/json` only); `state.json` |
 
-The container runs as root, so files in `data/` are owned by root on the host.
+The container runs as `TRASH_WATCH_UID:TRASH_WATCH_GID` (1000:1000 by default), which must own `./data`. Its root
+filesystem is read-only; `/tmp` is a tmpfs (git's `HOME`). If `/data` isn't writable, the run stops with an error
+that names the fix ([upgrading.md](upgrading.md#from-a-root-running-version-before-the-non-root-image)).
 
 ## Outbound connections
 
@@ -59,7 +62,8 @@ Everything is also printed to stdout (`docker compose logs trash-watch`): `OK â€
 
 Built from the [`Dockerfile`](../Dockerfile): `python:3.14-slim` (pinned by version and digest) with `git`
 and `ca-certificates`, PyYAML installed from the hash-pinned [`requirements.txt`](../requirements.txt), and
-`trash_watch.py` and `LICENSE` in `/app`; it runs `python -u trash_watch.py`. By default compose builds it
+`trash_watch.py` and `LICENSE` in `/app`; it runs `python -u trash_watch.py` as the unprivileged user `trash-watch`
+(uid/gid 1000). By default compose builds it
 from the checkout. Releases publish it for linux/amd64 and linux/arm64 as `ghcr.io/honeybeartech/trash-watch`,
 tagged with the version (`0.1.0`), major.minor (`0.1`) and `latest`, signed and with an SBOM and provenance
 ([verifying-releases.md](verifying-releases.md); planned: from the first release).

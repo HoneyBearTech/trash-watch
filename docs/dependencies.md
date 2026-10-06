@@ -26,7 +26,8 @@ always gets the same bytes:
 | Base image (`python:3.14-slim`, which brings Python and Debian) | [`Dockerfile`](../Dockerfile) | version tag and multi-arch digest | Docker / BuildKit |
 | git, ca-certificates | [`Dockerfile`](../Dockerfile) | the base image's Debian release | apt |
 | PyYAML (runtime) | [`requirements.in`](../requirements.in) → [`requirements.txt`](../requirements.txt) | exact version and SHA-256 hashes (`pip-compile --generate-hashes`) | `pip install --require-hashes --no-deps` |
-| Check and test tools (pytest, coverage, ruff, yamllint, PyYAML) | [`requirements-dev.in`](../requirements-dev.in) → [`requirements-dev.txt`](../requirements-dev.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` |
+| Check and test tools (pytest, coverage, Hypothesis, ruff, yamllint, PyYAML) | [`requirements-dev.in`](../requirements-dev.in) → [`requirements-dev.txt`](../requirements-dev.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` |
+| Atheris (coverage-guided fuzzing, Linux x86_64 only) | [`requirements-fuzz.in`](../requirements-fuzz.in) → [`requirements-fuzz.txt`](../requirements-fuzz.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` in [`fuzz.yml`](../.github/workflows/fuzz.yml) |
 | Linters and scanners used only by CI (actionlint, hadolint, gitleaks) | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | version tag and digest | Docker |
 | GitHub Actions | [`.github/workflows/`](../.github/workflows/) | full commit SHA (version in a comment) | GitHub Actions |
 

@@ -27,7 +27,13 @@ git checkout v0.1.0     # optional: a release tag instead of main (Planned: no r
 
 ```sh
 cp .env.example .env && chmod 600 .env
+mkdir -p data
 ```
+
+`data/` must exist before the first start and belong to the user the container runs as: uid and gid 1000
+by default, the first user on most Linux hosts. If `id -u` or `id -g` prints something else, set
+`TRASH_WATCH_UID` / `TRASH_WATCH_GID` in `.env`. (If Docker creates `data/` itself, it's owned by root, and
+trash-watch stops with the command that fixes it.)
 
 Set `RECYCLARR_CONFIG_PATH` to the directory from above, and `DISCORD_WEBHOOK` and/or `NTFY_URL`. Every
 setting is described in [interfaces.md](interfaces.md#settings). `.env` holds secrets: keep it `600`, owned
@@ -71,8 +77,9 @@ It checks at start-up and every `INTERVAL_HOURS` (default 24), and notifies only
 - Keep `.env` at `600`, and use a Discord webhook (or ntfy topic) dedicated to trash-watch, so it can be
   rotated alone.
 - Use an unguessable ntfy topic or ntfy access control: the topic URL is all anyone needs to post to it.
-- The container runs as root and writes only to `./data`. Planned: a non-root image
-  ([roadmap](roadmap.md)).
+- The container runs as an unprivileged user on a read-only root filesystem, with all Linux capabilities
+  dropped and `no-new-privileges`; it writes only to `./data` (and a temporary `/tmp`). Keep those settings
+  in `docker-compose.yml`.
 
 More in [security.md](security.md).
 
@@ -80,7 +87,7 @@ More in [security.md](security.md).
 
 ```sh
 docker compose down
-cd .. && rm -rf trash-watch     # removes .env and data/ too; data/ is owned by root, so this may need sudo
+cd .. && rm -rf trash-watch     # removes .env and data/ too
 ```
 
 trash-watch changed nothing in your Recyclarr config, so there is nothing to undo there. Delete the Discord

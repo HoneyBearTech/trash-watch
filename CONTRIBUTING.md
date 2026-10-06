@@ -48,6 +48,13 @@ The tests are offline: they run against small fixtures in [`tests/fixtures/`](te
 guides tree and a fake Recyclarr config), a local git repository stands in for GitHub, and any attempt to
 reach the network fails the test.
 
+[`tests/test_properties.py`](tests/test_properties.py) holds property-based tests (Hypothesis): arbitrary
+Unicode thrown at everything that turns names from the guides or the config into output. They run with the
+other tests (100 examples each; `pytest --hypothesis-profile=thorough` runs 5,000). The fuzz workflow
+([`.github/workflows/fuzz.yml`](.github/workflows/fuzz.yml)) drives the same properties with Atheris,
+coverage-guided, on pull requests that change the code and weekly; a crashing input is uploaded as an
+artifact and replays with `python fuzz/fuzz_properties.py <target> <file>` on Linux x86_64.
+
 ## Before you open a pull request
 
 Run what CI runs and make sure it passes:
@@ -84,7 +91,10 @@ The workflow, Dockerfile and secret scanners run in containers; the exact comman
 - **New functionality comes with automated tests.** A new check gets a fixture case that produces the
   finding and a case that must not; `test_exactly_the_expected_findings` stays exact, so a new false
   positive fails it.
-- **Bug fixes come with a regression test** that fails before the fix, where the bug can be tested at all.
+- **Bug fixes come with a regression test** that fails before the fix, where the bug can be tested at all. A
+  bug a property or the fuzzer found gets its input pinned as an `@example` on that property.
+- **Code that turns names from the guides or the config into output** (notifications, `--suggest`) keeps a
+  property in `tests/test_properties.py` and a target in `fuzz/fuzz_properties.py`.
 - Unit tests must keep statement and branch coverage of `trash_watch.py` at or above the floor in
   `pyproject.toml` (90 %); CI fails below it.
 - Tests never reach the network, a real Recyclarr config, or a notifier.

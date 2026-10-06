@@ -29,11 +29,15 @@ URLs that can post to your phone or Discord. These are the rules it keeps.
 - Outbound: GitHub over HTTPS (public guides repo, no token), plus your ntfy and Discord URLs. It refuses
   notifier URLs that don't start with `https://` or `http://`. Notifications contain only custom-format and
   profile names, `trash_id`s, scores and instance names from your config.
-- It runs as root inside the container, with `data/` as its only writable mount.
+- It runs as an unprivileged user (uid 1000 by default) on a read-only root filesystem, with all Linux
+  capabilities dropped and `no-new-privileges`; `data/` is its only writable mount (plus a temporary `/tmp`).
 
 ## Trust in the guides
 
-The guides' JSON is parsed as data and never executed. A compromised upstream could at worst produce
+The guides' JSON is parsed as data and never executed. Names from it (and from your config) are flattened
+to a single line before they reach a notification or the YAML that `--suggest` prints, so they can't add
+lines to a message or keys to YAML you paste, and Discord messages never mention anyone (`@everyone` stays
+text). A compromised upstream could at worst produce
 misleading findings. trash-watch changes nothing on its own, so acting on any finding is always your
 decision.
 
@@ -53,9 +57,9 @@ them before you run them: [verifying-releases.md](verifying-releases.md).
   there or whether `recyclarr sync` ran.
 - **A leaked notification URL.** Anyone who has it can post to your channel or topic; rotate it as described
   above.
-- **Root inside the container.** The process runs as root in its own container namespace (planned:
-  non-root, [roadmap](roadmap.md)). The read-only config mount and the single writable `data/` mount limit
-  what it can touch on the host.
+- **Discord formatting.** Names from the guides are shown as text: line breaks are flattened and mentions
+  are disabled, but Discord still renders Markdown in them (bold, links). That can make a message look odd;
+  it can't ping anyone or reach outside the channel.
 
 Why these requirements are met, and the threat model behind them, is in the
 [assurance case](assurance-case.md).
