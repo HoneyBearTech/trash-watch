@@ -1,3 +1,9 @@
+# trash-watch runtime data: guides cache + state.json (.env is covered further down)
+data/
+
+# macOS
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

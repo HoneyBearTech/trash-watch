@@ -1,0 +1,10 @@
+services:
+  trash-watch:
+    build: .
+    container_name: trash-watch
+    restart: unless-stopped
+    env_file: .env    # settings + secrets, never committed; template: .env.example
+    volumes:
+      # Recyclarr's app-data dir (the same dir Recyclarr mounts as /config). Always read-only.
+      - ${RECYCLARR_CONFIG_PATH:?set RECYCLARR_CONFIG_PATH in .env}:/config:ro
+      - ./data:/data    # guides cache + state
