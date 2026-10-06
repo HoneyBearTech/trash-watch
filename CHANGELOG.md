@@ -6,6 +6,17 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A health check: `trash_watch.py --health` (the image's `HEALTHCHECK`, every 5 minutes) reports the container
+  unhealthy when no check has completed for two intervals, so monitoring notices a watcher that crashed, hangs
+  or keeps failing.
+
+### Changed
+
+- A one-time check (`RUN_ONCE=1`) exits with code 1 when it fails, so it can be scripted.
+- `state.json` records the time of the last completed check in UTC (with a trailing `Z`).
+
 ## [0.1.1] - 2026-10-06
 
 A security release for the image; trash-watch itself is unchanged.

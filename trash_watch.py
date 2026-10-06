@@ -13,6 +13,7 @@ profiles it can't match to a guide profile are listed in the log on every run.
 """
 
 import argparse
+import calendar
 import hashlib
 import json
 import os
@@ -479,14 +480,31 @@ def run_once():
                 "fingerprints": fp,
                 "last_report": digest(report) if findings else None,
                 "commit": commit,
-                "checked": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "checked": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             },
             indent=2,
         )
     )
 
 
-if __name__ == "__main__":
+def health(now=None):
+    """Healthy when the last successful check finished within two intervals (plus ten minutes for the check
+    itself): `--health`, used by the image's HEALTHCHECK, so monitoring notices a watcher that stopped
+    checking, whether it crashed, hangs, or every check fails (a failed check doesn't update state.json)."""
+    try:
+        # UTC; states written before 0.2 have no "Z", but the container clock they came from was UTC too
+        stamp = json.loads(STATE.read_text())["checked"].rstrip("Z")
+        checked = calendar.timegm(time.strptime(stamp, "%Y-%m-%dT%H:%M:%S"))
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return False, f"unhealthy: no completed check recorded in {STATE} ({type(e).__name__})"
+    age = (time.time() if now is None else now) - checked
+    limit = 2 * INTERVAL + 600
+    if age > limit:
+        return False, f"unhealthy: last completed check {age / 3600:.1f} h ago (limit {limit / 3600:.1f} h)"
+    return True, f"healthy: last completed check {age / 3600:.1f} h ago"
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Check a Recyclarr config against the TRaSH Guides.")
     parser.add_argument(
         "--suggest",
@@ -494,14 +512,30 @@ if __name__ == "__main__":
         help="print Recyclarr YAML for each missing CF, grouped by profile, and exit "
         "(console only: no notifications, no state, never writes the config)",
     )
-    if parser.parse_args().suggest:
+    parser.add_argument(
+        "--health",
+        action="store_true",
+        help="exit 0 if a check completed within two intervals, 1 otherwise (the image's HEALTHCHECK)",
+    )
+    args = parser.parse_args(argv)
+    if args.health:
+        ok, message = health()
+        print(message, flush=True)
+        return 0 if ok else 1
+    if args.suggest:
         suggest()
-        raise SystemExit(0)
+        return 0
     while True:
         try:
             run_once()
         except Exception as e:  # noqa: BLE001 - report any failure, then try again next interval
             notify("trash-watch error", text=repr(e))
+            if RUN_ONCE:
+                return 1  # a one-time check that failed fails, so it can be scripted
         if RUN_ONCE:
-            break
+            return 0
         time.sleep(INTERVAL)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -109,7 +109,8 @@ config.
 ## State
 
 `data/state.json` holds a 16-character SHA-256 fingerprint of each guide CF and profile your config uses,
-a hash of the last report, the guides commit, the time of the last check and a format version. A CF's
+a hash of the last report, the guides commit, the time of the last completed check (UTC; `--health` reads it)
+and a format version. A CF's
 fingerprint covers only what affects you: its conditions, its rename flag, and its scores in the score
 sets your profiles use. So a new language's score set or a reworded description isn't a "change". A
 profile's covers everything but its description and group.

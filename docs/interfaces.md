@@ -15,7 +15,7 @@ and passes every line into the container.
 | `DISCORD_WEBHOOK` | unset | Discord webhook URL. **Secret.** |
 | `PROFILE_MAP` | `{}` | JSON object (one line, single-quoted) mapping your profile name to a guide quality profile's `trash_id` or exact name, e.g. `'{"Movies 4K": "<trash_id>"}'`. |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names to skip on purpose, e.g. `dc98083864ea246d05a42df0d05f81cc,My Profile`. No quotes, no comment on the same line. |
-| `RUN_ONCE` | unset | `1` = one check, then exit. Pass with `docker compose run -e RUN_ONCE=1`; never put it in `.env`. |
+| `RUN_ONCE` | unset | `1` = one check, then exit: exit code 0 if it completed, 1 if it failed (after the error notification). Pass with `docker compose run -e RUN_ONCE=1`; never put it in `.env`. |
 | `TRASH_WATCH_IMAGE` | `trash-watch:local` | Compose only: the image to run. Leave unset to build from the checkout, or set a release such as `ghcr.io/honeybeartech/trash-watch:0.1.1` ([verifying-releases.md](verifying-releases.md)). |
 | `TRASH_WATCH_UID` / `TRASH_WATCH_GID` | `1000` | Compose only: the user and group the container runs as. They must own `./data` on the host. |
 | `TRASH_WATCH_PULL_POLICY` | `build` | Compose only: `build` builds from the checkout on every start; `always` pulls `TRASH_WATCH_IMAGE` instead. |
@@ -56,6 +56,7 @@ Everything is also printed to stdout (`docker compose logs trash-watch`): `OK â€
 | Command | What it does |
 | --- | --- |
 | `python -u trash_watch.py` | The image's default: check, notify on change, save state, sleep `INTERVAL_HOURS`, repeat (once with `RUN_ONCE=1`) |
+| `python -u trash_watch.py --health` | Exits 0 if a check completed within two intervals (plus ten minutes), 1 otherwise, and prints how long ago it was. The image's `HEALTHCHECK` runs it every 5 minutes (after a 15-minute start period), so `docker ps` and monitoring tools see `healthy` / `unhealthy`. |
 | `python -u trash_watch.py --suggest` | Prints Recyclarr YAML for every guide CF a profile doesn't score, then exits. Console only: it sends no notifications, writes no state, and never writes the config. Run it with `docker compose run --rm trash-watch python -u trash_watch.py --suggest` or `make suggest`. |
 
 ## Image

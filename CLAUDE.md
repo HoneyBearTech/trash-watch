@@ -118,6 +118,8 @@ make build      # docker compose build
 make run-once   # build, then one check against the real config in .env (notifies if findings changed)
 make suggest    # build, then print Recyclarr YAML for missing CFs (console only)
 ```
+`main()` returns the exit code: `RUN_ONCE=1` → 0 or 1; `--health` → 0 if a check completed within two
+intervals (the image's `HEALTHCHECK`), else 1.
 
 One-time test by hand (no daemon; prints the result and exits):
 ```sh
