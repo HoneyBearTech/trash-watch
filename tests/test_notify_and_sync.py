@@ -124,3 +124,64 @@ def test_unwritable_data_dir_fails_early_with_the_fix(workspace: Path) -> None:
             tw.check_data_writable()
     finally:
         data.chmod(0o700)
+
+
+@pytest.fixture
+def requests_made(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    """Record (method, URL) for every request instead of sending it."""
+    made = []
+
+    def fake_urlopen(request: urllib.request.Request, timeout: float) -> None:
+        assert timeout == 15
+        made.append((request.get_method(), request.full_url))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    return made
+
+
+HEARTBEAT = "https://kuma.example/api/push/abc?status=up&msg=OK&ping="
+
+
+def test_a_completed_check_pings_the_heartbeat(
+    requests_made: list[tuple[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(tw, "HEARTBEAT_URL", HEARTBEAT)
+    monkeypatch.setattr(tw, "notify", lambda *_args, **_kwargs: None)
+    tw.run_once()
+    assert requests_made == [("GET", HEARTBEAT)]
+
+
+def test_a_failed_check_never_pings(requests_made: list[tuple[str, str]], monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail() -> str:
+        msg = "GitHub is down"
+        raise OSError(msg)
+
+    monkeypatch.setattr(tw, "HEARTBEAT_URL", HEARTBEAT)
+    monkeypatch.setattr(tw, "sync_guides", fail)
+    monkeypatch.setattr(tw, "RUN_ONCE", True)
+    monkeypatch.setattr(tw, "notify", lambda *_args, **_kwargs: None)
+    assert tw.main([]) == 1
+    assert requests_made == []
+
+
+def test_no_heartbeat_url_no_request(requests_made: list[tuple[str, str]], monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tw, "notify", lambda *_args, **_kwargs: None)
+    tw.run_once()
+    assert requests_made == []
+
+
+def test_heartbeat_refuses_non_http_urls_and_survives_failures(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(tw, "HEARTBEAT_URL", "file:///etc/passwd")
+    tw.heartbeat()
+    assert "heartbeat skipped: the URL must start with https:// or http://" in capsys.readouterr().out
+
+    def down(*_args: object, **_kwargs: object) -> None:
+        msg = "kuma is down"
+        raise OSError(msg)
+
+    monkeypatch.setattr(tw, "HEARTBEAT_URL", HEARTBEAT)
+    monkeypatch.setattr(urllib.request, "urlopen", down)
+    tw.heartbeat()  # doesn't raise
+    assert "heartbeat failed: kuma is down" in capsys.readouterr().out

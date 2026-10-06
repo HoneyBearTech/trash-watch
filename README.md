@@ -102,6 +102,7 @@ completing. To update it: `git pull && docker compose up -d --build`.
 | `INTERVAL_HOURS` | `24` | Hours between checks. Decimals are fine. |
 | `DISCORD_WEBHOOK` | empty | Discord webhook URL for notifications. **Secret.** |
 | `NTFY_URL` | empty | Full ntfy topic URL for notifications. **Secret.** With neither notifier set, findings only go to the log. |
+| `HEARTBEAT_URL` | empty | Pinged after every completed check, for a dead man's switch (an Uptime Kuma Push monitor, healthchecks.io): you're alerted when the pings stop. **Secret.** |
 | `PROFILE_MAP` | `{}` | One line of JSON in single quotes, mapping your profile names to guide profiles by `trash_id` or exact guide name. Use it for renamed profiles: `'{"SQP-3 Remux\|IMAX-E\|2160p": "[SQP] SQP-3"}'` |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names you skip on purpose. No quotes, and no comment on the same line. Example: `IGNORE=dc98083864ea246d05a42df0d05f81cc,2160p Low` |
 | `TRASH_WATCH_IMAGE` | `trash-watch:local` | The image compose runs. Leave unset to build from the checkout; set a signed release such as `ghcr.io/honeybeartech/trash-watch:0.1.1` to run that instead ([verify it first](docs/verifying-releases.md)). |

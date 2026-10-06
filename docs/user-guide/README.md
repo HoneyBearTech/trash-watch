@@ -77,8 +77,18 @@ your setup.
 
 The container reports its own health: `docker compose ps` shows `(healthy)` while checks keep completing,
 and `(unhealthy)` when none has completed for two intervals, whether it crashed, hangs or every check
-fails. Point your monitoring at that (for example an Uptime Kuma "Docker container" monitor), or run the
-check yourself: `docker exec trash-watch python -u trash_watch.py --health`.
+fails. Run the check yourself with `docker exec trash-watch python -u trash_watch.py --health`.
+
+To be **alerted** when it stops checking, give it a heartbeat: a monitor that expects a ping after every
+completed check, and alerts when the pings stop (a crash, a hang, or checks that keep failing all stop them).
+With Uptime Kuma:
+
+1. Add a monitor of type **Push**. Set its **heartbeat interval** a little longer than `INTERVAL_HOURS`, for
+   example 90,000 seconds (25 hours) for the default daily check, and pick your notification.
+2. Copy its push URL into `.env` as `HEARTBEAT_URL`, then `docker compose up -d`.
+
+The monitor goes up after the next completed check. healthchecks.io and similar services work the same way:
+set `HEARTBEAT_URL` to their ping URL. The URL carries a token, so treat it as a secret.
 
 ## Hearing about it again
 
