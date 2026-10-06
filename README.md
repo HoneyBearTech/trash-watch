@@ -1,2 +1,154 @@
 # trash-watch
-A small Docker sidecar for Recyclarr that watches TRaSH Guides daily and notifies via ntfy or Discord when your Sonarr/Radarr profiles fall behind.
+
+A small Docker sidecar for [Recyclarr](https://recyclarr.dev). Once a day it compares your Recyclarr
+config with the current [TRaSH Guides](https://github.com/TRaSH-Guides/Guides) JSON for Radarr and Sonarr.
+When your config has drifted from the guides, it sends a notification to Discord and/or ntfy.
+
+It only reads. Your Recyclarr config is mounted read-only, and trash-watch never talks to Radarr, Sonarr
+or Recyclarr.
+
+## Why
+
+Recyclarr keeps the custom formats *you list* in sync with the guides: their conditions, their names, and
+the guide's scores. It does what your config says, and it can't tell you what your config leaves out:
+
+- **A CF the guide added to your profile.** When TRaSH adds a CF to an SQP or other profile, Recyclarr
+  doesn't add it to your config. Your profile quietly stops matching the guide.
+- **A CF that was removed or renamed upstream.** Its `trash_id` lingers in your config, and Recyclarr can
+  no longer sync it.
+- **A score you overrode.** An explicit `score:` keeps winning after the guide changes its
+  recommendation.
+- **A guide change that alters what you grab.** Recyclarr applies it on the next sync, but nothing tells
+  you it happened or why.
+
+trash-watch reports each of these, groups them by profile, and stays quiet until something changes.
+
+## What it checks
+
+For every Radarr and Sonarr instance in your config:
+
+| Finding | Meaning |
+| --- | --- |
+| `CF <trash_id> removed or renamed upstream` | A `trash_id` in your config no longer exists in the guides |
+| `missing <CF>` | The guide's version of your profile has a CF that's nowhere in this instance |
+| `<CF>: synced, but not scored in this profile` | The CF exists in the instance, but none of this profile's `assign_scores_to` blocks lists it |
+| `score_set X, guide uses Y` | Your profile takes its scores from a different score set than the guide's profile |
+| `<CF>: N, guide M` | A score you set differs from the guide's score in your profile's score set |
+| `changed upstream: CF/Profile <name>` | A CF or profile you use changed in a way that affects you (its conditions, or its scores in your score sets) since the last check |
+
+Each profile in your config is matched to a guide profile by:
+1. its `trash_id`;
+2. `PROFILE_MAP`;
+3. its name, with or without a prefix such as `[SQP] `;
+4. its `score_set`, when only one guide profile uses that set.
+
+Every run logs what each profile was checked against, so a profile that matched nothing doesn't go
+unnoticed.
+
+## Setup
+
+You need a Docker host with Compose v2, running Recyclarr (v7 or v8) or with its config directory on disk.
+
+**1. Find Recyclarr's config directory.** This is the host path your Recyclarr container mounts at
+`/config`:
+
+```sh
+docker inspect recyclarr --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Source}}{{end}}{{end}}'
+```
+
+**2. Get trash-watch and create `.env`.**
+
+```sh
+git clone https://github.com/HoneyBearTech/trash-watch.git && cd trash-watch
+cp .env.example .env && chmod 600 .env
+```
+
+In `.env`, set `RECYCLARR_CONFIG_PATH` to the path from step 1 and add a Discord webhook or ntfy URL.
+`.env` holds secrets and is gitignored; never commit it.
+
+**3. Run one check.** It prints the result and exits:
+
+```sh
+make run-once        # or: docker compose run --rm --build -e RUN_ONCE=1 trash-watch
+```
+
+Read the per-profile lines at the top of the output. Add any profile marked `NOT CHECKED` to
+`PROFILE_MAP`, or to `IGNORE` if it's your own, then run again. Put any finding you're keeping on purpose
+in `IGNORE`.
+
+**4. Leave it running.**
+
+```sh
+docker compose up -d --build
+docker compose logs -f trash-watch
+```
+
+It checks at start-up and then every `INTERVAL_HOURS`. To update it: `git pull && docker compose up -d --build`.
+
+## Settings (`.env`)
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `RECYCLARR_CONFIG_PATH` | required | Host path of Recyclarr's config directory, mounted read-only at `/config`. Compose won't start without it. |
+| `INTERVAL_HOURS` | `24` | Hours between checks. Decimals are fine. |
+| `DISCORD_WEBHOOK` | empty | Discord webhook URL for notifications. **Secret.** |
+| `NTFY_URL` | empty | Full ntfy topic URL for notifications. **Secret.** With neither notifier set, findings only go to the log. |
+| `PROFILE_MAP` | `{}` | One line of JSON in single quotes, mapping your profile names to guide profiles by `trash_id` or exact guide name. Use it for renamed profiles: `'{"SQP-3 Remux\|IMAX-E\|2160p": "[SQP] SQP-3"}'` |
+| `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names you skip on purpose. No quotes, and no comment on the same line. Example: `IGNORE=dc98083864ea246d05a42df0d05f81cc,2160p Low` |
+
+`RUN_ONCE=1` (one check, then exit) is for `docker compose run -e RUN_ONCE=1` only. Don't put it in `.env`:
+with `restart: unless-stopped`, the container would start again straight after every exit.
+
+## Example output
+
+The log lists every profile, then the findings:
+
+```
+radarr/movies · SQP-1 (1080p): checked against [SQP] SQP-1 (1080p) (matched by name)
+radarr/movies4k · SQP-3 Remux|IMAX-E|2160p: checked against [SQP] SQP-3 (matched by PROFILE_MAP)
+sonarr/series · Anime: checked against [Anime] Remux-1080p (matched by score_set)
+sonarr/seriesv4 · 2160p Low: ignored (IGNORE)
+== Recyclarr vs TRaSH Guides @ e7c97a6: 3 item(s)
+radarr/movies · SQP-1 (1080p) (guide: [SQP] SQP-1 (1080p))
+• Repack/Proper: 99, guide 6
+• missing x265 (HD)
+sonarr/series · Anime (guide: [Anime] Remux-1080p)
+• missing VOSTFR
+```
+
+A Discord message has the same layout, with bold headings. It shows at most 3 items per profile and
+about 20 lines in total, then `…plus N more (full list: docker logs trash-watch)`. A run with nothing to
+report logs `OK — config matches TRaSH Guides @ <commit>`; a run whose findings haven't changed logs
+`No new findings` and sends nothing.
+
+## Limitations
+
+- **It checks the guide's core list for each profile, not every optional CF.** A guide profile's JSON
+  lists the CFs that profile needs. The optional extras in the guide's pages and in Recyclarr's templates
+  aren't checked.
+- **Guide-backed profiles (with a `trash_id`) are only checked to exist.** Recyclarr syncs their CFs and
+  scores from the guide itself.
+- **v8 `custom_format_groups` aren't understood yet.** trash-watch logs a warning when an instance uses
+  them, because "missing" findings for that instance may then be wrong.
+- **Template includes are resolved through `includes.json` in Recyclarr's config-templates checkout.**
+  Current v8 template repos don't have one, so such includes are logged as not found.
+- **Renamed profiles need a hint.** A profile whose name and `score_set` don't identify a guide profile
+  isn't checked until you add it to `PROFILE_MAP`. trash-watch doesn't guess.
+- **Scores are compared only where you set one explicitly.** Scores left to the guide are Recyclarr's job.
+- **It doesn't see what's live in Radarr or Sonarr.** It can't tell whether `recyclarr sync` ran or
+  succeeded, or what someone changed in the UI.
+- **Upstream changes need a previous run.** They show up in the one report after they happen. The first
+  run, or the first one after `data/state.json` is deleted, only records a baseline.
+- **Radarr and Sonarr only.** Lidarr, Readarr and others aren't checked.
+- **The container runs as root and needs HTTPS access to github.com.** Files in `data/` are owned by root.
+
+## Development
+
+```sh
+make test       # pytest against small fixtures in tests/ (no network, no Docker, no real config)
+make build      # docker compose build
+make run-once   # build, then one check against the config in .env
+```
+
+More detail is in [docs/](docs/README.md): how the check works, every interface and file, and the security
+model. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
