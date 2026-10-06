@@ -96,6 +96,16 @@ Each target is sent separately, so a failure on one doesn't stop the other.
 "Changed upstream" findings appear once: on the next run the stored fingerprint matches again. So a
 report that loses only those lines counts as changed and is sent again.
 
+## Suggest mode
+
+`--suggest` runs the same sync and checks, then prints a Recyclarr `custom_formats` block for each
+`missing` or `synced, but not scored` finding instead of reporting. Blocks are grouped by profile, with one
+block per guide score: `assign_scores_to` names the profile and sets the guide's score for the profile's
+`score_set` (falling back to `default`, and left out when the guide has no score). Profile names are quoted
+only when YAML needs it. The output parses as YAML, and it's indented to paste under an instance's
+`custom_formats:` list. Nothing else happens: no notification, no `state.json`, and no write to the
+config.
+
 ## State
 
 `data/state.json` holds a 16-character SHA-256 fingerprint of each guide CF and profile your config uses,

@@ -11,6 +11,7 @@ Reports:
 Only notifies when the findings change, so it won't spam you daily. Anything listed in IGNORE is skipped;
 profiles it can't match to a guide profile are listed in the log on every run.
 """
+import argparse
 import hashlib
 import json
 import os
@@ -162,9 +163,16 @@ def match_guide_profile(qp, guide_qps):
     return None, None
 
 
-def check(app, inst, cfs, qps, guides):
+def guide_score(cf, score_set):
+    """The guide's score for a CF in a score set, falling back to its default (None if it has neither)."""
+    scores = (cf or {}).get("trash_scores", {})
+    return scores.get(score_set, scores.get("default"))
+
+
+def check(app, inst, cfs, qps, guides, gaps=None):
     """Findings are (group, item) pairs; the group is the instance or instance · profile. Also returns the
-    CFs, guide profiles and score sets in use (for fingerprints) and one coverage line per profile (log)."""
+    CFs, guide profiles and score sets in use (for fingerprints) and one coverage line per profile (log).
+    With a gaps list, also appends one dict per guide CF a profile doesn't score (used by --suggest)."""
     g = guides[app]
     tag = f"{app}/{inst}"
     findings, used_cfs, used_qps, score_sets, coverage = [], set(), set(), {"default"}, []
@@ -213,11 +221,14 @@ def check(app, inst, cfs, qps, guides):
                 continue
             findings.append((group, f"{cf_name}: synced, but not scored in this profile" if tid in used_cfs
                              else f"missing {cf_name}"))
+            if gaps is not None:
+                gaps.append({"app": app, "instance": inst, "profile": qp.get("name"), "guide": gq["name"],
+                             "score_set": score_set, "trash_id": tid, "cf": cf_name,
+                             "score": guide_score(g["cf"].get(tid), score_set), "synced": tid in used_cfs})
         for tid, score in scored.items():
             if score is None or tid in IGNORE or tid not in g["cf"]:
                 continue
-            scores = g["cf"][tid].get("trash_scores", {})
-            want = scores.get(score_set, scores.get("default"))
+            want = guide_score(g["cf"][tid], score_set)
             if want is not None and want != score:
                 findings.append((group, f"{g['cf'][tid]['name']}: {score}, guide {want}"))
     return findings, used_cfs, used_qps, score_sets, coverage
@@ -284,6 +295,58 @@ def notify(title, findings=(), text=None):
              {"Content-Type": "application/json"})
 
 
+def yaml_scalar(value):
+    """A profile name as YAML: plain when that round-trips, otherwise double-quoted."""
+    try:
+        if yaml.safe_load(f"k: {value}") == {"k": value}:
+            return value
+    except yaml.YAMLError:
+        pass
+    return json.dumps(value)
+
+
+def render_suggestions(gaps, commit):
+    """Recyclarr custom_formats blocks for the gaps, one per profile and guide score, indented to paste
+    under an instance's custom_formats: list. Text only; the caller prints it."""
+    out = [f"# trash-watch --suggest @ TRaSH Guides {commit}. Nothing has been written to your config.",
+           "# Review each block, paste it into that instance's custom_formats: list, then run",
+           "# `recyclarr sync --preview` before `recyclarr sync`."]
+    if not gaps:
+        return "\n".join(out + ["#", "# Nothing to suggest: every checked profile scores all its guide CFs."])
+    profiles = {}
+    for gap in sorted(gaps, key=lambda x: (x["app"], x["instance"], x["profile"], x["cf"])):
+        profiles.setdefault((gap["app"], gap["instance"], gap["profile"]), []).append(gap)
+    for (app, inst, profile), items in profiles.items():
+        first = items[0]
+        out += ["", f"# {app}/{inst} · {profile} (guide: {first['guide']}, score_set {first['score_set']})",
+                f"# paste under:  {app}: > {inst}: > custom_formats:"]
+        by_score = {}
+        for gap in items:
+            by_score.setdefault(gap["score"], []).append(gap)
+        for score, block in by_score.items():
+            out.append("      - trash_ids:")
+            for gap in block:
+                note = " (already synced, not scored in this profile)" if gap["synced"] else ""
+                out.append(f"          - {gap['trash_id']} # {gap['cf']}{note}")
+            out += ["        assign_scores_to:", f"          - name: {yaml_scalar(profile)}"]
+            if score is not None:  # without a score, Recyclarr uses the guide's (or 0)
+                out.append(f"            score: {score}")
+    return "\n".join(out)
+
+
+def suggest():
+    """--suggest: print paste-ready blocks for every missing or unscored guide CF. Prints only: no state,
+    no notifications, and the config stays read-only."""
+    commit = sync_guides()
+    guides = load_guides()
+    warnings, gaps = [], []
+    for app, inst, cfs, qps in load_instances(warnings):
+        check(app, inst, cfs, qps, guides, gaps)
+    print(render_suggestions(gaps, commit), flush=True)
+    for w in warnings:
+        print(f"# warning: {w}", flush=True)
+
+
 def run_once():
     commit = sync_guides()
     guides = load_guides()
@@ -331,6 +394,13 @@ def run_once():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Check a Recyclarr config against the TRaSH Guides.")
+    parser.add_argument("--suggest", action="store_true",
+                        help="print Recyclarr YAML for each missing CF, grouped by profile, and exit "
+                             "(console only: no notifications, no state, never writes the config)")
+    if parser.parse_args().suggest:
+        suggest()
+        raise SystemExit(0)
     while True:
         try:
             run_once()

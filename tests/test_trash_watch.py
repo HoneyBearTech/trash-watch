@@ -67,3 +67,61 @@ def test_secret_and_env_var_tags_load_without_being_resolved(workspace, findings
     assert movies["base_url"] == "RADARR_URL"
     assert len(tw.load_instances([])) == 1
     assert findings()  # and the checks run on that config
+
+
+def test_suggest_prints_paste_ready_yaml_for_missing_cf(capsys):
+    tw.suggest()
+    out = capsys.readouterr().out
+
+    assert "# radarr/movies · SQP-1 (1080p) (guide: [SQP] SQP-1 (1080p), score_set sqp-1-1080p)" in out
+    assert "# paste under:  radarr: > movies: > custom_formats:" in out
+    # The output is valid YAML: exactly the block to add, scored with the guide's score for the profile
+    assert yaml.safe_load(out) == [{
+        "trash_ids": [X265_HD],
+        "assign_scores_to": [{"name": "SQP-1 (1080p)", "score": -10000}],
+    }]
+
+
+def test_suggest_only_prints(workspace, notifications, capsys):
+    config = {p: p.read_bytes() for p in (workspace / "config").rglob("*") if p.is_file()}
+    tw.suggest()
+
+    assert {p: p.read_bytes() for p in (workspace / "config").rglob("*") if p.is_file()} == config
+    assert not tw.STATE.exists()  # no state written, so the daemon's next report isn't affected
+    assert notifications == []
+    assert "Nothing has been written to your config" in capsys.readouterr().out
+
+
+def test_suggest_respects_ignore(capsys, monkeypatch):
+    monkeypatch.setattr(tw, "IGNORE", {X265_HD})
+    tw.suggest()
+    out = capsys.readouterr().out
+    assert "Nothing to suggest" in out
+    assert yaml.safe_load(out) is None
+
+
+def test_suggestions_grouped_by_profile_and_score():
+    def gap(profile, tid, cf, score, synced=False):
+        return {"app": "sonarr", "instance": "series", "profile": profile, "guide": "WEB-1080p",
+                "score_set": "default", "trash_id": tid, "cf": cf, "score": score, "synced": synced}
+
+    text = tw.render_suggestions([
+        gap("WEB: 1080p", "c1" * 16, "AV1", -10000),
+        gap("WEB: 1080p", "c2" * 16, "BR-DISK", -10000, synced=True),
+        gap("WEB: 1080p", "c3" * 16, "Repack/Proper", 5),
+        gap("Anime", "c4" * 16, "VOSTFR", None),
+    ], "abc1234")
+
+    assert yaml.safe_load(text) == [
+        {"trash_ids": ["c4" * 16], "assign_scores_to": [{"name": "Anime"}]},  # no guide score: none set
+        {"trash_ids": ["c1" * 16, "c2" * 16], "assign_scores_to": [{"name": "WEB: 1080p", "score": -10000}]},
+        {"trash_ids": ["c3" * 16], "assign_scores_to": [{"name": "WEB: 1080p", "score": 5}]},
+    ]
+    assert "already synced, not scored in this profile" in text
+    assert text.count("# sonarr/series · ") == 2
+
+
+def test_yaml_scalar_quotes_only_when_needed():
+    for name in ("SQP-3 Remux|IMAX-E|2160p", "WEB-DL (1080p)", "a: b", "#tag", "123", "yes", "- x"):
+        assert yaml.safe_load(f"k: {tw.yaml_scalar(name)}") == {"k": name}
+    assert tw.yaml_scalar("SQP-3 Remux|IMAX-E|2160p") == "SQP-3 Remux|IMAX-E|2160p"

@@ -1,4 +1,4 @@
-.PHONY: test build run-once
+.PHONY: test build run-once suggest
 
 PYTHON ?= python3
 VENV := .venv
@@ -19,3 +19,7 @@ build:
 # One check against the real config from .env, then exit (sends notifications if any are set)
 run-once: build
 	docker compose run --rm -e RUN_ONCE=1 trash-watch
+
+# Paste-ready Recyclarr YAML for each missing CF, printed to the console only (no notifications, no state)
+suggest: build
+	docker compose run --rm trash-watch python -u trash_watch.py --suggest

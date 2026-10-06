@@ -121,6 +121,30 @@ about 20 lines in total, then `…plus N more (full list: docker logs trash-watc
 report logs `OK — config matches TRaSH Guides @ <commit>`; a run whose findings haven't changed logs
 `No new findings` and sends nothing.
 
+## Suggested fixes (`--suggest`)
+
+To fix what it found, have trash-watch print the Recyclarr YAML for every guide CF a profile doesn't score.
+The snippets are grouped by profile, with the guide's score for that profile's `score_set`:
+
+```sh
+make suggest     # or: docker compose run --rm --build trash-watch python -u trash_watch.py --suggest
+```
+
+```yaml
+# sonarr/series · Anime (guide: [Anime] Remux-1080p, score_set anime-sonarr)
+# paste under:  sonarr: > series: > custom_formats:
+      - trash_ids:
+          - 07a32f77690263bb9fda1842db7e273f # VOSTFR
+        assign_scores_to:
+          - name: Anime
+            score: -10000
+```
+
+It only prints to the console. It never writes to your config (which is mounted read-only anyway), sends no
+notifications, and doesn't touch `data/state.json`, so the daily report isn't affected. CFs in `IGNORE`
+are left out. Each snippet is indented to paste directly under that instance's `custom_formats:` list. Run
+`recyclarr sync --preview` before you sync.
+
 ## Limitations
 
 - **It checks the guide's core list for each profile, not every optional CF.** A guide profile's JSON
@@ -148,7 +172,11 @@ report logs `OK — config matches TRaSH Guides @ <commit>`; a run whose finding
 make test       # pytest against small fixtures in tests/ (no network, no Docker, no real config)
 make build      # docker compose build
 make run-once   # build, then one check against the config in .env
+make suggest    # build, then print paste-ready YAML for missing CFs (console only)
 ```
+
+`make` isn't installed on every Docker host. Each target is a single `docker compose` command, so you can
+copy it from the [Makefile](Makefile).
 
 More detail is in [docs/](docs/README.md): how the check works, every interface and file, and the security
 model. Changes are listed in [CHANGELOG.md](CHANGELOG.md).

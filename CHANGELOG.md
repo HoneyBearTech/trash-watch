@@ -8,6 +8,9 @@ All notable changes to trash-watch are documented here. The format follows
 
 ### Added
 
+- `--suggest` (`make suggest`): prints paste-ready Recyclarr YAML (trash_ids plus `assign_scores_to` with
+  the guide's score) for every guide CF a profile doesn't score, grouped by profile. Console only: it never
+  writes the config, notifies or saves state.
 - The watcher (`trash_watch.py`), its `Dockerfile` and `docker-compose.yml`: a daily check of a Recyclarr
   config against the TRaSH Guides JSON for Radarr and Sonarr, with ntfy and Discord notifications sent
   only when the findings change.

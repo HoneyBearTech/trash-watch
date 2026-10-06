@@ -46,6 +46,13 @@ other target.
 Everything is also printed to stdout (`docker compose logs trash-watch`): `OK — ...`, `No new findings
 ...`, or the full report under `== <title>`.
 
+## Command line
+
+| Command | What it does |
+| --- | --- |
+| `python -u trash_watch.py` | The image's default: check, notify on change, save state, sleep `INTERVAL_HOURS`, repeat (once with `RUN_ONCE=1`) |
+| `python -u trash_watch.py --suggest` | Prints Recyclarr YAML for every guide CF a profile doesn't score, then exits. Console only: it sends no notifications, writes no state, and never writes the config. Run it with `docker compose run --rm trash-watch python -u trash_watch.py --suggest` or `make suggest`. |
+
 ## Image
 
 Built locally from the [`Dockerfile`](../Dockerfile): `python:3.12-slim` with `git`, `ca-certificates` and

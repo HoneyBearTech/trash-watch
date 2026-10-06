@@ -47,7 +47,11 @@ only commit or push it when the owner asks.
   produces exactly one known finding. `conftest.py` points the module's paths at a per-test copy, blanks
   `PROFILE_MAP`/`IGNORE`, stubs `sync_guides` and makes `urlopen` fail. New check or bug fix → add a case;
   keep `test_exactly_the_expected_findings` exact.
-- `Makefile`: `make test` (builds `.venv`, runs pytest), `make build`, `make run-once`.
+- `Makefile`: `make test` (builds `.venv`, runs pytest), `make build`, `make run-once`, `make suggest`.
+  Atlas has no `make`; run the target's `docker compose` line there.
+- `--suggest` (`suggest()` / `render_suggestions()`): prints paste-ready `custom_formats` blocks for the gaps
+  `check()` collects. **Console only, by design:** it must never write the config (or anywhere else),
+  notify, or save state. Never add an option that applies the suggestions.
 - `docker-compose.yml`: the one service, built locally. It reads settings from `.env` (`env_file`) and
   mounts `${RECYCLARR_CONFIG_PATH}` at `/config:ro` and `./data` at `/data`.
 - `.env.example`: template for `.env`, listing every setting.
@@ -70,6 +74,7 @@ change: a profile marked "NOT CHECKED" is silently missing from the findings.
 make test       # unit tests against the fixtures (no network, no Docker, no real config)
 make build      # docker compose build
 make run-once   # build, then one check against the real config in .env (notifies if findings changed)
+make suggest    # build, then print Recyclarr YAML for missing CFs (console only)
 ```
 
 One-time test by hand (no daemon; prints the result and exits):
