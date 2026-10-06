@@ -1,5 +1,13 @@
 # trash-watch
 
+[![CI](https://github.com/HoneyBearTech/trash-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/HoneyBearTech/trash-watch/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/HoneyBearTech/trash-watch/actions/workflows/codeql.yml/badge.svg)](https://github.com/HoneyBearTech/trash-watch/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HoneyBearTech/trash-watch/badge)](https://scorecard.dev/viewer/?uri=github.com/HoneyBearTech/trash-watch)
+<!-- TODO: BP_ID - register at bestpractices.dev, then uncomment these two badges with the project ID
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/<BP_ID>/badge)](https://www.bestpractices.dev/projects/<BP_ID>)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/<BP_ID>/baseline)](https://www.bestpractices.dev/projects/<BP_ID>)
+-->
+
 A small Docker sidecar for [Recyclarr](https://recyclarr.dev). Once a day it compares your Recyclarr
 config with the current [TRaSH Guides](https://github.com/TRaSH-Guides/Guides) JSON for Radarr and Sonarr.
 When your config has drifted from the guides, it sends a notification to Discord and/or ntfy.
@@ -95,6 +103,8 @@ It checks at start-up and then every `INTERVAL_HOURS`. To update it: `git pull &
 | `NTFY_URL` | empty | Full ntfy topic URL for notifications. **Secret.** With neither notifier set, findings only go to the log. |
 | `PROFILE_MAP` | `{}` | One line of JSON in single quotes, mapping your profile names to guide profiles by `trash_id` or exact guide name. Use it for renamed profiles: `'{"SQP-3 Remux\|IMAX-E\|2160p": "[SQP] SQP-3"}'` |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names you skip on purpose. No quotes, and no comment on the same line. Example: `IGNORE=dc98083864ea246d05a42df0d05f81cc,2160p Low` |
+| `TRASH_WATCH_IMAGE` | `trash-watch:local` | The image compose runs. Leave unset to build from the checkout; set a signed release such as `ghcr.io/honeybeartech/trash-watch:0.1.0` to run that instead ([verify it first](docs/verifying-releases.md)). |
+| `TRASH_WATCH_PULL_POLICY` | `build` | `build` builds from the checkout on every start; set `always` together with a release `TRASH_WATCH_IMAGE`. |
 
 `RUN_ONCE=1` (one check, then exit) is for `docker compose run -e RUN_ONCE=1` only. Don't put it in `.env`:
 with `restart: unless-stopped`, the container would start again straight after every exit.
@@ -166,17 +176,42 @@ are left out. Each snippet is indented to paste directly under that instance's `
 - **Radarr and Sonarr only.** Lidarr, Readarr and others aren't checked.
 - **The container runs as root and needs HTTPS access to github.com.** Files in `data/` are owned by root.
 
+## Running it securely
+
+- Keep the Recyclarr config mount read-only (`:ro`); trash-watch never needs to write there.
+- Keep `.env` at `chmod 600` and out of git. Use a Discord webhook or ntfy topic dedicated to trash-watch,
+  so it can be rotated on its own; anyone with the URL can post to it.
+- If you run a release image, [verify its signature](docs/verifying-releases.md) and pin the version.
+- What trash-watch protects and what it doesn't: [docs/security.md](docs/security.md).
+
+## Documentation
+
+- [Quick start](docs/quick-start.md) and [Installing](docs/installing.md): setup, release images, running
+  it securely, uninstalling
+- [User guide](docs/user-guide/README.md): reading notifications, `PROFILE_MAP`, `IGNORE`, applying fixes
+- [How it works](docs/architecture.md): each run, every finding, when you're notified
+- [Interfaces](docs/interfaces.md): every setting, mount, file, command and connection
+- [Upgrading](docs/upgrading.md) and [Verifying releases](docs/verifying-releases.md)
+- [Security requirements](docs/security.md), [Assurance case](docs/assurance-case.md) and
+  [Dependencies](docs/dependencies.md)
+- [Roadmap](docs/roadmap.md), including what trash-watch won't do
+- Project policies: [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md),
+  [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) and
+  [CHANGELOG.md](CHANGELOG.md)
+
 ## Development
 
 ```sh
-make test       # pytest against small fixtures in tests/ (no network, no Docker, no real config)
+make test       # pytest with coverage against small fixtures in tests/ (no network, no Docker, no real config)
+make lint       # ruff, ruff format, yamllint
 make build      # docker compose build
 make run-once   # build, then one check against the config in .env
 make suggest    # build, then print paste-ready YAML for missing CFs (console only)
 ```
 
 `make` isn't installed on every Docker host. Each target is a single `docker compose` command, so you can
-copy it from the [Makefile](Makefile).
+copy it from the [Makefile](Makefile). How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-More detail is in [docs/](docs/README.md): how the check works, every interface and file, and the security
-model. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+## License
+
+[MIT](LICENSE).

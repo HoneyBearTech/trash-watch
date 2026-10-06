@@ -26,9 +26,9 @@ URLs that can post to your phone or Discord. These are the rules it keeps.
 ## What it can reach
 
 - It opens no ports.
-- Outbound: GitHub over HTTPS (public guides repo, no token), plus your ntfy and Discord URLs.
-  Notifications contain only custom-format and profile names, `trash_id`s, scores and instance names
-  from your config.
+- Outbound: GitHub over HTTPS (public guides repo, no token), plus your ntfy and Discord URLs. It refuses
+  notifier URLs that don't start with `https://` or `http://`. Notifications contain only custom-format and
+  profile names, `trash_id`s, scores and instance names from your config.
 - It runs as root inside the container, with `data/` as its only writable mount.
 
 ## Trust in the guides
@@ -36,3 +36,26 @@ URLs that can post to your phone or Discord. These are the rules it keeps.
 The guides' JSON is parsed as data and never executed. A compromised upstream could at worst produce
 misleading findings. trash-watch changes nothing on its own, so acting on any finding is always your
 decision.
+
+## Releases
+
+Released images and files are signed keylessly and carry an SBOM and build provenance; tags are signed. Check
+them before you run them: [verifying-releases.md](verifying-releases.md).
+
+## What trash-watch does not protect against
+
+- **Anyone who can write to the host**, its Docker daemon, `.env`, the Recyclarr config directory or
+  `data/`. Those are trusted inputs: whoever controls them controls what trash-watch reads, reports and
+  where it sends it.
+- **Wrong guidance.** trash-watch reports differences from the TRaSH Guides as they are; it can't tell
+  whether the guides are right for you, or notice if the guides repository itself were compromised.
+- **Changes made outside the config.** It doesn't talk to Radarr or Sonarr, so it can't see what's live
+  there or whether `recyclarr sync` ran.
+- **A leaked notification URL.** Anyone who has it can post to your channel or topic; rotate it as described
+  above.
+- **Root inside the container.** The process runs as root in its own container namespace (planned:
+  non-root, [roadmap](roadmap.md)). The read-only config mount and the single writable `data/` mount limit
+  what it can touch on the host.
+
+Why these requirements are met, and the threat model behind them, is in the
+[assurance case](assurance-case.md).
