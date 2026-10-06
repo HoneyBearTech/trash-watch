@@ -1,6 +1,7 @@
 version: 2
-# Update PRs are reviewed and merged by hand, never auto-merged: CI must pass, and a base-image or
-# PyYAML bump is worth a one-time check against a real Recyclarr config (make run-once) first.
+# Patch and minor updates to the Python packages and Actions, and patch updates to the base image, are
+# auto-merged once the required checks pass (workflows/dependabot-auto-merge.yml). Major updates and a new
+# Python minor wait for a human, and a one-time check against a real Recyclarr config (make run-once).
 updates:
   # The base image in the Dockerfile (version tag and digest).
   - package-ecosystem: "docker"

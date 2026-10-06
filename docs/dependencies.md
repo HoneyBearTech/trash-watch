@@ -43,8 +43,16 @@ To update a pinned Python dependency, edit the `.in` file if needed and run
 - **Dependency review** ([`.github/workflows/dependency-review.yml`](../.github/workflows/dependency-review.yml))
   blocks a pull request that adds or changes a dependency with a known vulnerability of moderate severity or
   higher, or with a license outside the allowlist.
-- Pull requests are **merged by hand**, never automatically: CI must pass, and a base-image or PyYAML bump
-  gets a one-time check against a real config first.
+- **Low-risk updates merge automatically**
+  ([`.github/workflows/dependabot-auto-merge.yml`](../.github/workflows/dependabot-auto-merge.yml)): patch
+  and minor updates to the Python packages and GitHub Actions, and patch updates to the base image
+  (3.14.7 to 3.14.8), are squash-merged once every required check has passed (CI with the image build and
+  start, CodeQL, dependency review). Nothing skips a check, and a failing update stays open for the
+  maintainer.
+- **Everything else is merged by hand**: major updates, and a base image moving to a new Python minor
+  (3.14 to 3.15), get a one-time check against a real config first.
+- A merged update reaches users only in the next release; the maintainer's own deployment runs a released
+  image pinned by digest.
 - The CI-only images in `run:` steps aren't seen by Dependabot; they're bumped by hand at least every
   quarter.
 

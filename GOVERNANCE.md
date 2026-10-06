@@ -33,7 +33,8 @@ reasoning, and may change course. Because the code is MIT-licensed, you can alwa
 | Security reporter | Anyone who reports a vulnerability | Report privately and allow time for a fix before disclosing, as described in [SECURITY.md](SECURITY.md). |
 
 Automated tools also take part: Dependabot proposes updates to the base image, the Python packages and the
-GitHub Actions (the maintainer merges each by hand), and CI, CodeQL, dependency review and OpenSSF Scorecard
+GitHub Actions (patch and minor updates merge automatically once every required check passes; the
+maintainer merges the rest by hand), and CI, CodeQL, dependency review and OpenSSF Scorecard
 check every change.
 
 ## Access to sensitive resources
@@ -49,7 +50,7 @@ Who can change the code, releases and project settings, as of the date of this f
 | Reading the repository from the maintainer's own server | that server | a read-only deploy key that only works for this repository |
 | The OpenSSF Best Practices badge entry | the maintainer | GitHub sign-in |
 | Security advisories and private vulnerability reports | the maintainer | GitHub |
-| Automated changes | Dependabot (pull requests only; it can't merge, and the required check must pass) | GitHub |
+| Automated changes | Dependabot (pull requests only); the auto-merge workflow turns on auto-merge for its patch and minor updates, which GitHub merges only after every required check passes | GitHub, short-lived `GITHUB_TOKEN` |
 
 There are no other collaborators. Workflows use the per-job `GITHUB_TOKEN`, read-only unless a job asks for
 more, and repository secrets are only available to the workflows that name them, never to pull requests

@@ -80,7 +80,8 @@ only commit or push it when the owner asks.
   `scorecard.yml`, `dependency-review.yml`, `dco.yml`, `scan.yml` (weekly Trivy scan of the `main` build and the latest GHCR release → code scanning), `fuzz.yml` (Atheris per target: 60 s on PRs touching the
   code, 10 min weekly; not a required check), `release.yml` (on a `v*.*.*` tag: multi-arch image to
   GHCR, cosign keyless, SBOM + provenance, GitHub Release from the tag's `CHANGELOG.md` section, signed
-  `SHA256SUMS`); `dependabot.yml`; issue/PR templates; `CODEOWNERS`; `allowed_signers` (tag-signing key).
+  `SHA256SUMS`), `dependabot-auto-merge.yml` (auto-merge for Dependabot's patch/minor updates; base image
+  patch only); `dependabot.yml`; issue/PR templates; `CODEOWNERS`; `allowed_signers` (tag-signing key).
   Actions pinned by full SHA; every workflow has top-level `permissions:`; untrusted input only via `env:`.
 - Root policies: `SECURITY.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`.
 - `tests/`: pytest, no network. `tests/fixtures/guides/docs/json/radarr/` is a tiny fake guides tree (three
