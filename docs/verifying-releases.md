@@ -15,26 +15,26 @@ workflow when a version tag is pushed. You can check that what you run came from
 
 This applies to every release, starting with 0.1.0. You need
 [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3.0 or later (with cosign 2.6, add
-`--new-bundle-format` to `cosign verify`). The examples use version 0.1.0; substitute the one you run.
+`--new-bundle-format` to `cosign verify`). The examples use version 0.1.1; substitute the one you run.
 
 ## The image
 
 ```sh
-cosign verify ghcr.io/honeybeartech/trash-watch:0.1.0 \
+cosign verify ghcr.io/honeybeartech/trash-watch:0.1.1 \
   --certificate-identity-regexp '^https://github\.com/HoneyBearTech/trash-watch/\.github/workflows/release\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 cosign prints the verified signatures, including the commit and tag they were built from. A tag such as
-`0.1.0` can be moved, a digest can't: for the strongest guarantee, pin the digest from the release's
+`0.1.1` can be moved, a digest can't: for the strongest guarantee, pin the digest from the release's
 `image.txt` (after verifying it, below), for example
 `TRASH_WATCH_IMAGE=ghcr.io/honeybeartech/trash-watch@sha256:…`.
 
 To see the SBOM and the provenance:
 
 ```sh
-docker buildx imagetools inspect ghcr.io/honeybeartech/trash-watch:0.1.0 --format '{{ json .SBOM }}'
-docker buildx imagetools inspect ghcr.io/honeybeartech/trash-watch:0.1.0 --format '{{ json .Provenance }}'
+docker buildx imagetools inspect ghcr.io/honeybeartech/trash-watch:0.1.1 --format '{{ json .SBOM }}'
+docker buildx imagetools inspect ghcr.io/honeybeartech/trash-watch:0.1.1 --format '{{ json .Provenance }}'
 ```
 
 ## The release files
@@ -58,11 +58,11 @@ With the [GitHub CLI](https://cli.github.com/), check that a downloaded release 
 repository's release workflow:
 
 ```sh
-gh attestation verify trash-watch-0.1.0.tar.gz --repo HoneyBearTech/trash-watch \
+gh attestation verify trash-watch-0.1.1.tar.gz --repo HoneyBearTech/trash-watch \
   --signer-workflow HoneyBearTech/trash-watch/.github/workflows/release.yml
 ```
 
-To verify offline, add `--bundle trash-watch-0.1.0.provenance.sigstore.json`. Every file listed in
+To verify offline, add `--bundle trash-watch-0.1.1.provenance.sigstore.json`. Every file listed in
 `SHA256SUMS` is covered.
 
 ## The git tag
@@ -72,7 +72,7 @@ The maintainer signs version tags with an SSH key whose public half is in
 
 ```sh
 git clone https://github.com/HoneyBearTech/trash-watch.git && cd trash-watch
-git -c gpg.ssh.allowedSignersFile=.github/allowed_signers tag -v v0.1.0
+git -c gpg.ssh.allowedSignersFile=.github/allowed_signers tag -v v0.1.1
 ```
 
 It should print `Good "git" signature for 31805425+HoneyBearTech@users.noreply.github.com`. Check

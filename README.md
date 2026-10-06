@@ -102,7 +102,7 @@ It checks at start-up and then every `INTERVAL_HOURS`. To update it: `git pull &
 | `NTFY_URL` | empty | Full ntfy topic URL for notifications. **Secret.** With neither notifier set, findings only go to the log. |
 | `PROFILE_MAP` | `{}` | One line of JSON in single quotes, mapping your profile names to guide profiles by `trash_id` or exact guide name. Use it for renamed profiles: `'{"SQP-3 Remux\|IMAX-E\|2160p": "[SQP] SQP-3"}'` |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names you skip on purpose. No quotes, and no comment on the same line. Example: `IGNORE=dc98083864ea246d05a42df0d05f81cc,2160p Low` |
-| `TRASH_WATCH_IMAGE` | `trash-watch:local` | The image compose runs. Leave unset to build from the checkout; set a signed release such as `ghcr.io/honeybeartech/trash-watch:0.1.0` to run that instead ([verify it first](docs/verifying-releases.md)). |
+| `TRASH_WATCH_IMAGE` | `trash-watch:local` | The image compose runs. Leave unset to build from the checkout; set a signed release such as `ghcr.io/honeybeartech/trash-watch:0.1.1` to run that instead ([verify it first](docs/verifying-releases.md)). |
 | `TRASH_WATCH_UID` / `TRASH_WATCH_GID` | `1000` | The unprivileged user and group the container runs as. They must own `data/` on the host; change them if your host user isn't 1000 (`id -u`, `id -g`). |
 | `TRASH_WATCH_PULL_POLICY` | `build` | `build` builds from the checkout on every start; set `always` together with a release `TRASH_WATCH_IMAGE`. |
 

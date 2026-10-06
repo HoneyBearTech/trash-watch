@@ -20,7 +20,7 @@ TRaSH Guides. For a first look, the [quick start](quick-start.md) is shorter; th
 
 ```sh
 git clone https://github.com/HoneyBearTech/trash-watch.git && cd trash-watch
-git checkout v0.1.0     # optional: a release tag instead of main
+git checkout v0.1.1     # optional: a release tag instead of main
 ```
 
 ## 2. Create `.env`
@@ -47,7 +47,7 @@ from the `Dockerfile` with its pinned base image and hash-checked packages.
 **Or run a signed release image** from GHCR. Add to `.env`:
 
 ```sh
-TRASH_WATCH_IMAGE=ghcr.io/honeybeartech/trash-watch:0.1.0
+TRASH_WATCH_IMAGE=ghcr.io/honeybeartech/trash-watch:0.1.1
 TRASH_WATCH_PULL_POLICY=always
 ```
 
