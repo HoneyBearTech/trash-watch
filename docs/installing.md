@@ -20,7 +20,7 @@ TRaSH Guides. For a first look, the [quick start](quick-start.md) is shorter; th
 
 ```sh
 git clone https://github.com/HoneyBearTech/trash-watch.git && cd trash-watch
-git checkout v0.1.0     # optional: a release tag instead of main (Planned: no release has been tagged yet)
+git checkout v0.1.0     # optional: a release tag instead of main
 ```
 
 ## 2. Create `.env`
@@ -52,7 +52,7 @@ TRASH_WATCH_PULL_POLICY=always
 ```
 
 and [verify its signature](verifying-releases.md) before the first start. Pin a version rather than
-`latest`, so upgrades happen when you choose. (Planned: images are published from the first release.)
+`latest`, so upgrades happen when you choose.
 
 ## 4. Check once, then start it
 
