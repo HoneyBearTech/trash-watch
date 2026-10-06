@@ -1,0 +1,3 @@
+# What trash-watch needs at runtime (installed into the image). Pinned with hashes in requirements.txt,
+# regenerated with:  pip-compile --generate-hashes --strip-extras requirements.in
+pyyaml
