@@ -67,7 +67,7 @@ notifiers (only their status matters). The full list of settings, mounts and con
 | Complete mediation | Every notification URL is checked for scheme before every send; every config file goes through the same safe loader. |
 | Open design | Everything is public and documented; security rests on the operator's `.env` and file permissions, not on secrecy of the code. |
 | Separation of privilege | Publishing a release needs both a tag pushed by the maintainer and the release workflow's identity; changes to `main` need a pull request and a passing check. |
-| Least privilege | Read-only config mount; no published ports; workflows default to read-only tokens and each job asks only for what it needs; a server that pulls the repository needs only a read-only, single-repository deploy key. The container still runs as root inside its namespace (planned: non-root, [roadmap](roadmap.md)). |
+| Least privilege | Unprivileged container user, read-only root filesystem, all capabilities dropped, `no-new-privileges`; read-only config mount; no published ports; workflows default to read-only tokens and each job asks only for what it needs; a server that pulls the repository needs only a read-only, single-repository deploy key. |
 | Least common mechanism | trash-watch shares nothing with Recyclarr but the read-only directory; it has its own container and state. |
 | Psychological acceptability | One `.env` with placeholders for every setting; `--suggest` prints fixes for the operator to review and paste, so the safe path (review, then `recyclarr sync --preview`) is also the easy one. |
 
@@ -81,6 +81,8 @@ notifiers (only their status matters). The full list of settings, mounts and con
 | SSRF / unexpected URL schemes (CWE-918, CWE-73) | Notification URLs must be `http(s)://`; the guides repository URL is a constant | `post()`; `test_non_http_notifier_urls_are_refused` |
 | OS command injection (CWE-78) | git runs with an argument list, never a shell; the only variable arguments are this script's own paths | `git()` in [`trash_watch.py`](../trash_watch.py); ruff S603 with a reviewed exception |
 | Unintended writes to the operator's config (CWE-732) | Read-only mount; no code path writes outside `data/`; `--suggest` prints only | [`docker-compose.yml`](../docker-compose.yml); `test_suggest_only_prints` (config bytes unchanged, no state written) |
+| Injection into output the operator acts on: YAML they paste, notification lines, chat mentions (CWE-74, CWE-117) | Names from the guides and the config are flattened to one line (`one_line()`); YAML scalars come from PyYAML's emitter; scores must be integers; Discord payloads set `allowed_mentions` to none | Property tests with arbitrary Unicode in [`tests/test_properties.py`](../tests/test_properties.py) (the pasted YAML parses back to exactly the intended blocks), fuzzed with Atheris ([`fuzz.yml`](../.github/workflows/fuzz.yml)) |
+| Execution with unnecessary privileges (CWE-250) | Non-root user, read-only root filesystem, no capabilities | [`Dockerfile`](../Dockerfile), [`docker-compose.yml`](../docker-compose.yml); CI checks the image's uid and starts it locked down |
 | Uncontrolled resource consumption (CWE-400) | Shallow, sparse clone of `docs/json` only; 15 s notifier timeouts; notifications capped at about 20 lines and Discord's 2,000 characters | `sync_guides()`; `test_notification_is_capped_for_a_phone` |
 | Incorrect logic hiding drift | Each check has a fixture case; an exact-findings test catches new false positives; profile coverage is logged on every run | [`tests/`](../tests/); `test_exactly_the_expected_findings`, `test_unmatched_and_ignored_profiles_are_logged_not_silently_skipped` |
 | Inclusion of functionality from an untrusted source (CWE-829, CWE-494) | Digest-pinned base image, hash-pinned packages, SHA-pinned Actions; signed releases | [`Dockerfile`](../Dockerfile), [`requirements.txt`](../requirements.txt), the workflows; OpenSSF Scorecard (Pinned-Dependencies) |
@@ -91,9 +93,10 @@ notifiers (only their status matters). The full list of settings, mounts and con
 
 On every push and pull request, CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs ruff
 (including the bandit security rules) and `ruff format`, yamllint, actionlint with shellcheck, hadolint,
-gitleaks over the full history, the unit tests with a 90 % branch-coverage floor, an image build and start,
+gitleaks over the full history, the unit and property tests (Hypothesis) with a 90 % branch-coverage floor, an image build and start,
 and a compose-file check. CodeQL analyses the Python code and the workflows on every change and weekly;
-dependency review and a DCO check run on every pull request; OpenSSF Scorecard scores the repository
+dependency review and a DCO check run on every pull request; Atheris fuzzes the property tests on pull
+requests that change the code and for ten minutes per target weekly; OpenSSF Scorecard scores the repository
 weekly. Releases are signed and carry an SBOM and provenance.
 
 This document is reviewed when the threat model changes: a new input or output, a new kind of secret, any

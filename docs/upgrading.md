@@ -23,8 +23,20 @@ run.
 
 ```sh
 cp .env .env.backup
-sudo cp data/state.json data/state.json.backup      # data/ is owned by root (the container's user)
+cp data/state.json data/state.json.backup
 ```
+
+## From a root-running version (before the non-root image)
+
+Older versions ran as root, so their `data/` is owned by root, and the new unprivileged container can't write
+to it: it stops with an error that names this fix. Run it once, in the trash-watch directory, before
+starting the new version (no sudo needed; Docker does it):
+
+```sh
+docker run --rm -v "$PWD/data:/data" busybox chown -R 1000:1000 /data
+```
+
+Use your `TRASH_WATCH_UID:TRASH_WATCH_GID` instead of `1000:1000` if you set them. The saved state is kept.
 
 ## From a checkout (building the image)
 
@@ -50,6 +62,7 @@ cp .env.backup .env
 sudo cp data/state.json.backup data/state.json
 ```
 
-Without the backup, delete `data/state.json` instead: the next run notifies the current findings again and
+Rolling back past the non-root change is fine: a root-running container can write to a `data/` owned by
+uid 1000. Without the backup, delete `data/state.json` instead: the next run notifies the current findings again and
 starts a new baseline. trash-watch never changed your Recyclarr config, so there's nothing to roll back
 there.

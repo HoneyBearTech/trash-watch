@@ -53,3 +53,17 @@ All notable changes to trash-watch are documented here. The format follows
 
 - Notifier URLs that don't start with `https://` or `http://` are refused, so a mistyped `.env` value
   can't make trash-watch open a `file:` or other URL.
+- The container runs as an unprivileged user (uid/gid 1000, or `TRASH_WATCH_UID`/`TRASH_WATCH_GID`) on a
+  read-only root filesystem, with all Linux capabilities dropped and `no-new-privileges`.
+- Names from the guides and the config are flattened to one line before they reach a notification or the YAML
+  `--suggest` prints, so a line break in a custom format's name can no longer add keys to YAML you paste;
+  profile names and trash_ids are quoted by PyYAML's emitter; guide scores must be integers. Discord messages
+  no longer mention anyone (a name like `@everyone` stays text).
+- Property-based tests (Hypothesis) and coverage-guided fuzzing (Atheris, `fuzz.yml`) of that code.
+
+### Upgrading
+
+- From a version that ran as root: `data/` is owned by root, so make it the container user's once, in the
+  trash-watch directory, before starting the new version:
+  `docker run --rm -v "$PWD/data:/data" busybox chown -R 1000:1000 /data` ([docs/upgrading.md](docs/upgrading.md)).
+  Without it, trash-watch stops with an error that names this command.

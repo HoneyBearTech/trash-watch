@@ -67,6 +67,7 @@ docker inspect recyclarr --format '{{range .Mounts}}{{if eq .Destination "/confi
 ```sh
 git clone https://github.com/HoneyBearTech/trash-watch.git && cd trash-watch
 cp .env.example .env && chmod 600 .env
+mkdir -p data      # created by you, so it belongs to your user (uid 1000 by default)
 ```
 
 In `.env`, set `RECYCLARR_CONFIG_PATH` to the path from step 1 and add a Discord webhook or ntfy URL.
@@ -102,6 +103,7 @@ It checks at start-up and then every `INTERVAL_HOURS`. To update it: `git pull &
 | `PROFILE_MAP` | `{}` | One line of JSON in single quotes, mapping your profile names to guide profiles by `trash_id` or exact guide name. Use it for renamed profiles: `'{"SQP-3 Remux\|IMAX-E\|2160p": "[SQP] SQP-3"}'` |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names you skip on purpose. No quotes, and no comment on the same line. Example: `IGNORE=dc98083864ea246d05a42df0d05f81cc,2160p Low` |
 | `TRASH_WATCH_IMAGE` | `trash-watch:local` | The image compose runs. Leave unset to build from the checkout; set a signed release such as `ghcr.io/honeybeartech/trash-watch:0.1.0` to run that instead ([verify it first](docs/verifying-releases.md)). |
+| `TRASH_WATCH_UID` / `TRASH_WATCH_GID` | `1000` | The unprivileged user and group the container runs as. They must own `data/` on the host; change them if your host user isn't 1000 (`id -u`, `id -g`). |
 | `TRASH_WATCH_PULL_POLICY` | `build` | `build` builds from the checkout on every start; set `always` together with a release `TRASH_WATCH_IMAGE`. |
 
 `RUN_ONCE=1` (one check, then exit) is for `docker compose run -e RUN_ONCE=1` only. Don't put it in `.env`:
@@ -172,11 +174,14 @@ are left out. Each snippet is indented to paste directly under that instance's `
 - **Upstream changes need a previous run.** They show up in the one report after they happen. The first
   run, or the first one after `data/state.json` is deleted, only records a baseline.
 - **Radarr and Sonarr only.** Lidarr, Readarr and others aren't checked.
-- **The container runs as root and needs HTTPS access to github.com.** Files in `data/` are owned by root.
+- **It needs HTTPS access to github.com.** The container runs as an unprivileged user (uid 1000 by default), so
+  `data/` must belong to that uid on the host.
 
 ## Running it securely
 
-- Keep the Recyclarr config mount read-only (`:ro`); trash-watch never needs to write there.
+- Keep the Recyclarr config mount read-only (`:ro`); trash-watch never needs to write there. The container runs
+  unprivileged, on a read-only root filesystem, with no Linux capabilities; keep those settings in
+  `docker-compose.yml`.
 - Keep `.env` at `chmod 600` and out of git. Use a Discord webhook or ntfy topic dedicated to trash-watch,
   so it can be rotated on its own; anyone with the URL can post to it.
 - If you run a release image, [verify its signature](docs/verifying-releases.md) and pin the version.

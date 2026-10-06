@@ -18,6 +18,11 @@ Recyclarr config against the TRaSH Guides JSON (`TRaSH-Guides/Guides`, `docs/jso
 - **Never modify the real Recyclarr config.** Don't write, "fix", reformat or copy over files in the
   Recyclarr app-data directory, on the production host or anywhere else. To experiment, copy the config into a scratch
   directory and point `RECYCLARR_CONFIG_PATH` there.
+- **The container stays unprivileged.** It runs as `TRASH_WATCH_UID:TRASH_WATCH_GID` (default 1000:1000) on a
+  read-only root filesystem with `cap_drop: [ALL]` and `no-new-privileges`. Don't add `user: root`, capabilities
+  or writable mounts; anything that needs to write goes under `/data` or `/tmp`.
+- **Names are untrusted.** Anything from the guides or the config that reaches output goes through `one_line()`;
+  YAML scalars through `yaml_scalar()`; Discord payloads keep `allowed_mentions: {parse: []}`.
 - **Secrets go in `.env`, which is never committed.** That covers the Discord webhook, the ntfy URL and
   anything else that grants access. `.gitignore` covers `.env` and `data/`; extend it rather than work
   around it. Only `.env.example` (placeholders, no real values) is committed.
@@ -36,8 +41,8 @@ Recyclarr config against the TRaSH Guides JSON (`TRaSH-Guides/Guides`, `docs/jso
 
 ## Stack
 - Python 3.14 (one script, standard library plus PyYAML), git, Docker Compose. No web UI, no HTTP API.
-- Tooling: ruff (lint and format), yamllint, pytest + coverage (90 % branch floor), pip-tools for the
-  hash-pinned requirements. CI-only: actionlint, hadolint, gitleaks, CodeQL, Scorecard, dependency review.
+- Tooling: ruff (lint and format), yamllint, pytest + coverage (90 % branch floor), Hypothesis (property tests),
+  Atheris (coverage-guided fuzzing, Linux x86_64 only), pip-tools for the hash-pinned requirements. CI-only: actionlint, hadolint, gitleaks, CodeQL, Scorecard, dependency review.
 - Releases: signed multi-arch images on GHCR (cosign keyless), SBOM, SLSA provenance, signed checksums.
 
 ## Before making structural changes
@@ -62,10 +67,16 @@ only commit or push it when the owner asks.
   `requirements.txt` (`--require-hashes`), `trash_watch.py` and `LICENSE`; runs `trash_watch.py` unbuffered.
   `requirements.in` / `requirements-dev.in` are the sources; regenerate the `.txt` files with
   `pip-compile --generate-hashes --strip-extras <file>.in`.
+- `tests/test_properties.py`: Hypothesis properties over arbitrary Unicode for every name-to-output path
+  (notification caps and counts, Discord payload, `yaml_scalar`, `--suggest` YAML round trip, `load_yaml`,
+  `check()` on well-formed but arbitrary configs and guides). Bugs they find get an `@example`.
+  `pytest --hypothesis-profile=thorough` = 5,000 examples each. `fuzz/fuzz_properties.py` drives the same
+  properties with Atheris; `requirements-fuzz.in/.txt` pins it (compile in a linux/amd64 container).
 - `pyproject.toml`: ruff rules, pytest options (warnings are errors), coverage floor. `.yamllint.yml`.
 - `.github/`: `ci.yml` (one job, "Checks + tests", the required check: ruff, yamllint, actionlint, hadolint,
   gitleaks over the history, pytest + coverage, image build/start, compose config), `codeql.yml`,
-  `scorecard.yml`, `dependency-review.yml`, `dco.yml`, `release.yml` (on a `v*.*.*` tag: multi-arch image to
+  `scorecard.yml`, `dependency-review.yml`, `dco.yml`, `fuzz.yml` (Atheris per target: 60 s on PRs touching the
+  code, 10 min weekly; not a required check), `release.yml` (on a `v*.*.*` tag: multi-arch image to
   GHCR, cosign keyless, SBOM + provenance, GitHub Release from the tag's `CHANGELOG.md` section, signed
   `SHA256SUMS`); `dependabot.yml`; issue/PR templates; `CODEOWNERS`; `allowed_signers` (tag-signing key).
   Actions pinned by full SHA; every workflow has top-level `permissions:`; untrusted input only via `env:`.
