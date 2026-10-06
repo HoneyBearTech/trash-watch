@@ -3,10 +3,8 @@
 [![CI](https://github.com/HoneyBearTech/trash-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/HoneyBearTech/trash-watch/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/HoneyBearTech/trash-watch/actions/workflows/codeql.yml/badge.svg)](https://github.com/HoneyBearTech/trash-watch/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HoneyBearTech/trash-watch/badge)](https://scorecard.dev/viewer/?uri=github.com/HoneyBearTech/trash-watch)
-<!-- TODO: BP_ID - register at bestpractices.dev, then uncomment these two badges with the project ID
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/<BP_ID>/badge)](https://www.bestpractices.dev/projects/<BP_ID>)
-[![OpenSSF Baseline](https://www.bestpractices.dev/projects/<BP_ID>/baseline)](https://www.bestpractices.dev/projects/<BP_ID>)
--->
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15256/badge)](https://www.bestpractices.dev/projects/15256)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/15256/baseline)](https://www.bestpractices.dev/projects/15256)
 
 A small Docker sidecar for [Recyclarr](https://recyclarr.dev). Once a day it compares your Recyclarr
 config with the current [TRaSH Guides](https://github.com/TRaSH-Guides/Guides) JSON for Radarr and Sonarr.
