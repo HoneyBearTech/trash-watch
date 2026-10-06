@@ -5,7 +5,8 @@ name: Release
 # image is pushed with SBOM and SLSA provenance attestations and signed keylessly with cosign (Sigstore,
 # identity = this workflow on the tag). The GitHub Release carries the CHANGELOG.md section for the
 # version, a source archive (with LICENSE), the image digest, a signed SHA256SUMS and SLSA build
-# provenance for those files. How to verify: docs/verifying-releases.md.
+# provenance for those files, as a Sigstore bundle and as in-toto JSON Lines.
+# How to verify: docs/verifying-releases.md.
 on:
   push:
     tags: ["v*.*.*"]
@@ -133,6 +134,10 @@ jobs:
         run: |
           version="${TAG#v}"
           cp "$BUNDLE" "trash-watch-${version}.provenance.sigstore.json"
+          # The same provenance as in-toto JSON Lines (one DSSE envelope per line), the format tools such as
+          # OpenSSF Scorecard look for in release assets.
+          jq -c '.dsseEnvelope' "$BUNDLE" > "trash-watch-${version}.intoto.jsonl"
+          test -s "trash-watch-${version}.intoto.jsonl"
           # The "## [x.y.z]" section of CHANGELOG.md, up to the next "## [" heading.
           awk -v v="$version" '
             index($0, "## [" v "]") == 1 { found = 1; next }
@@ -156,4 +161,5 @@ jobs:
         run: |
           gh release create "$TAG" --repo "$REPO" --verify-tag \
             --title "trash-watch ${TAG}" --notes-file notes.md \
-            trash-watch-*.tar.gz image.txt SHA256SUMS SHA256SUMS.sigstore.json trash-watch-*.provenance.sigstore.json
+            trash-watch-*.tar.gz image.txt SHA256SUMS SHA256SUMS.sigstore.json trash-watch-*.provenance.sigstore.json \
+            trash-watch-*.intoto.jsonl
