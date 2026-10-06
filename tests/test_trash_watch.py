@@ -1,5 +1,9 @@
+from pathlib import Path
+from typing import Any
+
 import pytest
 import yaml
+from conftest import EditGuideCf, RunChecks
 
 import trash_watch as tw
 
@@ -7,23 +11,23 @@ SQP1 = "radarr/movies · SQP-1 (1080p) (guide: [SQP] SQP-1 (1080p))"
 X265_HD = "a0000000000000000000000000000001"
 
 
-def test_dead_trash_id(findings):
+def test_dead_trash_id(findings: RunChecks) -> None:
     assert ("radarr/movies", "CF deadbeefdeadbeefdeadbeefdeadbeef removed or renamed upstream") in findings()
 
 
-def test_missing_cf_for_sqp_profile(findings):
+def test_missing_cf_for_sqp_profile(findings: RunChecks) -> None:
     result = findings()
     assert (SQP1, "missing x265 (HD)") in result
     # CFs the profile does score aren't reported as missing
     assert not [item for group, item in result if "BR-DISK" in item or "missing Repack" in item]
 
 
-def test_score_mismatch_uses_the_profiles_score_set(findings):
+def test_score_mismatch_uses_the_profiles_score_set(findings: RunChecks) -> None:
     # The guide's default score is 5, but the profile's score_set is sqp-1-1080p, where it's 6
     assert (SQP1, "Repack/Proper: 99, guide 6") in findings()
 
 
-def test_exactly_the_expected_findings(findings):
+def test_exactly_the_expected_findings(findings: RunChecks) -> None:
     assert sorted(findings()) == sorted(
         [
             ("radarr/movies", "CF deadbeefdeadbeefdeadbeefdeadbeef removed or renamed upstream"),
@@ -33,12 +37,14 @@ def test_exactly_the_expected_findings(findings):
     )
 
 
-def test_ignore_skips_a_deliberately_missing_cf(findings, monkeypatch):
+def test_ignore_skips_a_deliberately_missing_cf(findings: RunChecks, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tw, "IGNORE", {X265_HD})
     assert (SQP1, "missing x265 (HD)") not in findings()
 
 
-def test_upstream_change_detected_between_two_runs(notifications, edit_guide_cf):
+def test_upstream_change_detected_between_two_runs(
+    notifications: list[list[tw.Finding]], edit_guide_cf: EditGuideCf
+) -> None:
     tw.run_once()  # first run: baseline fingerprints, no upstream changes possible
     assert not [f for f in notifications[0] if "changed upstream" in f[0]]
 
@@ -48,7 +54,9 @@ def test_upstream_change_detected_between_two_runs(notifications, edit_guide_cf)
     assert ("radarr · changed upstream", "CF BR-DISK") in notifications[1]
 
 
-def test_unrelated_upstream_edit_is_not_a_change(notifications, edit_guide_cf):
+def test_unrelated_upstream_edit_is_not_a_change(
+    notifications: list[list[tw.Finding]], edit_guide_cf: EditGuideCf
+) -> None:
     tw.run_once()
     # A score set no profile here uses, and the description link, don't affect this config
     edit_guide_cf(
@@ -62,7 +70,7 @@ def test_unrelated_upstream_edit_is_not_a_change(notifications, edit_guide_cf):
     assert len(notifications) == 1  # findings unchanged, so the second run sent nothing
 
 
-def test_secret_and_env_var_tags_load_without_being_resolved(workspace, findings):
+def test_secret_and_env_var_tags_load_without_being_resolved(workspace: Path, findings: RunChecks) -> None:
     text = (workspace / "config/recyclarr.yml").read_text()
     with pytest.raises(yaml.constructor.ConstructorError):
         yaml.safe_load(text)  # plain YAML rejects Recyclarr's custom tags
@@ -75,7 +83,7 @@ def test_secret_and_env_var_tags_load_without_being_resolved(workspace, findings
     assert findings()  # and the checks run on that config
 
 
-def test_suggest_prints_paste_ready_yaml_for_missing_cf(capsys):
+def test_suggest_prints_paste_ready_yaml_for_missing_cf(capsys: pytest.CaptureFixture[str]) -> None:
     tw.suggest()
     out = capsys.readouterr().out
 
@@ -90,7 +98,9 @@ def test_suggest_prints_paste_ready_yaml_for_missing_cf(capsys):
     ]
 
 
-def test_suggest_only_prints(workspace, notifications, capsys):
+def test_suggest_only_prints(
+    workspace: Path, notifications: list[list[tw.Finding]], capsys: pytest.CaptureFixture[str]
+) -> None:
     config = {p: p.read_bytes() for p in (workspace / "config").rglob("*") if p.is_file()}
     tw.suggest()
 
@@ -100,7 +110,7 @@ def test_suggest_only_prints(workspace, notifications, capsys):
     assert "Nothing has been written to your config" in capsys.readouterr().out
 
 
-def test_suggest_respects_ignore(capsys, monkeypatch):
+def test_suggest_respects_ignore(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tw, "IGNORE", {X265_HD})
     tw.suggest()
     out = capsys.readouterr().out
@@ -108,8 +118,8 @@ def test_suggest_respects_ignore(capsys, monkeypatch):
     assert yaml.safe_load(out) is None
 
 
-def test_suggestions_grouped_by_profile_and_score():
-    def gap(profile, tid, cf, score, synced=False):
+def test_suggestions_grouped_by_profile_and_score() -> None:
+    def gap(profile: str, tid: str, cf: str, score: int | None, *, synced: bool = False) -> dict[str, Any]:
         return {
             "app": "sonarr",
             "instance": "series",
@@ -141,7 +151,7 @@ def test_suggestions_grouped_by_profile_and_score():
     assert text.count("# sonarr/series · ") == 2
 
 
-def test_yaml_scalar_quotes_only_when_needed():
+def test_yaml_scalar_quotes_only_when_needed() -> None:
     for name in ("SQP-3 Remux|IMAX-E|2160p", "WEB-DL (1080p)", "a: b", "#tag", "123", "yes", "- x"):
         assert yaml.safe_load(f"k: {tw.yaml_scalar(name)}") == {"k": name}
     assert tw.yaml_scalar("SQP-3 Remux|IMAX-E|2160p") == "SQP-3 Remux|IMAX-E|2160p"

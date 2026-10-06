@@ -1,6 +1,11 @@
 """How the Recyclarr config is read (includes, templates, unknown keys) and how profiles match the guide."""
 
 import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+from conftest import RunChecks
 
 import trash_watch as tw
 
@@ -8,23 +13,23 @@ SQP1_ID = "b0000000000000000000000000000001"
 X265_HD = "a0000000000000000000000000000001"
 
 
-def write(path, text):
+def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
 
 
-def write_config(workspace, text):
+def write_config(workspace: Path, text: str) -> None:
     write(workspace / "config/recyclarr.yml", text)
 
 
-def coverage_lines():
+def coverage_lines() -> list[str]:
     guides, lines = tw.load_guides(), []
-    for app, inst, cfs, qps in tw.load_instances([]):
-        lines += tw.check(app, inst, cfs, qps, guides)[4]
+    for instance in tw.load_instances([]):
+        lines += tw.check(instance, guides)[4]
     return lines
 
 
-def test_local_and_template_includes_are_merged(workspace, findings):
+def test_local_and_template_includes_are_merged(workspace: Path, findings: RunChecks) -> None:
     # x265 (HD) comes from a template include, so the SQP profile no longer misses it
     write(
         workspace / "config/repositories/config-templates/includes.json",
@@ -52,7 +57,7 @@ def test_local_and_template_includes_are_merged(workspace, findings):
     assert not [f for f in findings() if "x265" in f[1]]
 
 
-def test_missing_include_and_unknown_key_are_warned(workspace):
+def test_missing_include_and_unknown_key_are_warned(workspace: Path) -> None:
     text = (workspace / "config/recyclarr.yml").read_text()
     write_config(
         workspace,
@@ -67,7 +72,7 @@ def test_missing_include_and_unknown_key_are_warned(workspace):
     assert any("'some_future_setting' isn't understood" in w for w in warnings)
 
 
-def test_configs_dir_and_scored_only_profiles_are_read(workspace):
+def test_configs_dir_and_scored_only_profiles_are_read(workspace: Path) -> None:
     write(
         workspace / "config/configs/sonarr.yml",
         "sonarr:\n  series:\n    custom_formats:\n      - trash_ids: []\n"
@@ -78,17 +83,17 @@ def test_configs_dir_and_scored_only_profiles_are_read(workspace):
     assert instances["sonarr", "series"] == [{"name": "Only Scored Here"}]
 
 
-def guide_qps():
+def guide_qps() -> dict[str, dict[str, Any]]:
     return tw.load_guides()["radarr"]["qp"]
 
 
-def test_profile_map_by_trash_id_or_guide_name(monkeypatch):
+def test_profile_map_by_trash_id_or_guide_name(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tw, "PROFILE_MAP", {"Mine": SQP1_ID, "Also mine": "[SQP] SQP-1 (1080p)"})
     assert tw.match_guide_profile({"name": "Mine"}, guide_qps())[1] == "PROFILE_MAP"
     assert tw.match_guide_profile({"name": "Also mine"}, guide_qps())[0]["trash_id"] == SQP1_ID
 
 
-def test_unique_score_set_matches_but_never_guesses(workspace):
+def test_unique_score_set_matches_but_never_guesses(workspace: Path) -> None:
     gq, how = tw.match_guide_profile({"name": "Renamed", "score_set": "sqp-1-1080p"}, guide_qps())
     assert (gq["trash_id"], how) == (SQP1_ID, "score_set")
 
@@ -100,7 +105,9 @@ def test_unique_score_set_matches_but_never_guesses(workspace):
     assert tw.match_guide_profile({"name": "Renamed", "score_set": "default"}, guide_qps()) == (None, None)
 
 
-def test_unmatched_and_ignored_profiles_are_logged_not_silently_skipped(workspace, monkeypatch):
+def test_unmatched_and_ignored_profiles_are_logged_not_silently_skipped(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     text = (workspace / "config/recyclarr.yml").read_text()
     write_config(
         workspace,
@@ -113,7 +120,7 @@ def test_unmatched_and_ignored_profiles_are_logged_not_silently_skipped(workspac
     assert "radarr/movies · SQP-1 (1080p): checked against [SQP] SQP-1 (1080p) (matched by name)" in lines
 
 
-def test_score_set_mismatch_and_dead_guide_backed_profile(workspace, findings):
+def test_score_set_mismatch_and_dead_guide_backed_profile(workspace: Path, findings: RunChecks) -> None:
     text = (workspace / "config/recyclarr.yml").read_text()
     text = text.replace("score_set: sqp-1-1080p", "score_set: default")
     text = text.replace(

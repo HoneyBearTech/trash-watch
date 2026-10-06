@@ -11,6 +11,7 @@ import collections
 import datetime
 import json
 import re
+from typing import Any
 
 import yaml
 from hypothesis import example, given
@@ -27,7 +28,7 @@ FOOTER = re.compile(r"…plus (\d+) more \(full list: docker logs trash-watch\)"
 
 
 @given(st.lists(st.tuples(any_text, any_text), max_size=60), st.booleans())
-def test_notifications_stay_phone_sized_whatever_the_names(findings, bold):
+def test_notifications_stay_phone_sized_whatever_the_names(findings: list[tw.Finding], bold: bool) -> None:  # noqa: FBT001 - Hypothesis passes drawn values positionally
     text = tw.render(findings, max_lines=tw.MAX_LINES, max_chars=1900, bold=bold)
     assert len(text) <= 1900
     assert len(text.split("\n")) <= tw.MAX_LINES
@@ -35,7 +36,7 @@ def test_notifications_stay_phone_sized_whatever_the_names(findings, bold):
 
 
 @given(st.lists(st.tuples(plain_text, plain_text), max_size=60))
-def test_every_finding_is_shown_or_counted_in_a_more_line(findings):
+def test_every_finding_is_shown_or_counted_in_a_more_line(findings: list[tw.Finding]) -> None:
     distinct = len(set(findings))
     shown = counted = 0
     for line in tw.render(findings, max_lines=tw.MAX_LINES, max_chars=1900).split("\n"):
@@ -52,14 +53,14 @@ def test_every_finding_is_shown_or_counted_in_a_more_line(findings):
 
 @given(any_text, st.lists(st.tuples(any_text, any_text), max_size=60))
 @example(title="@everyone", findings=[("radarr/movies · @here", "missing <@&123> @everyone")])
-def test_discord_messages_fit_and_never_mention_anyone(title, findings):
+def test_discord_messages_fit_and_never_mention_anyone(title: str, findings: list[tw.Finding]) -> None:
     payload = json.loads(tw.discord_payload(title, findings))
     assert len(payload["content"]) <= 2000
     assert payload["allowed_mentions"] == {"parse": []}
 
 
 @given(any_text)
-def test_yaml_scalars_load_back_as_exactly_the_string(value):
+def test_yaml_scalars_load_back_as_exactly_the_string(value: str) -> None:
     assert yaml.safe_load(f"k: {tw.yaml_scalar(value)}") == {"k": value}
 
 
@@ -95,7 +96,7 @@ REGRESSION_GAP = {
 @example(gap_list=[REGRESSION_GAP], commit="abc1234")  # a line break in a CF name ended the comment line
 @example(gap_list=[], commit="\r>")  # ...and so did one in the commit, in the header
 @example(gap_list=[{**REGRESSION_GAP, "profile": "\U0001f600 \u2028", "trash_id": ""}], commit="x")  # emoji, separators
-def test_suggestions_parse_back_to_exactly_the_blocks_for_the_gaps(gap_list, commit):
+def test_suggestions_parse_back_to_exactly_the_blocks_for_the_gaps(gap_list: list[dict[str, Any]], commit: str) -> None:
     blocks = yaml.safe_load(tw.render_suggestions(gap_list, commit)) or []
     got = collections.Counter(
         (tid, block["assign_scores_to"][0]["name"], block["assign_scores_to"][0].get("score"))
@@ -109,7 +110,7 @@ def test_suggestions_parse_back_to_exactly_the_blocks_for_the_gaps(gap_list, com
 PLAIN_TYPES = (dict, list, str, int, float, bool, type(None), datetime.date, bytes, set)
 
 
-def plain(value):
+def plain(value: object) -> bool:
     if isinstance(value, dict):
         return all(plain(k) and plain(v) for k, v in value.items())
     if isinstance(value, (list, set)):
@@ -118,7 +119,7 @@ def plain(value):
 
 
 @given(any_text)
-def test_loading_config_text_only_ever_builds_plain_data(text):
+def test_loading_config_text_only_ever_builds_plain_data(text: str) -> None:
     try:
         doc = tw.load_yaml(text)
     except yaml.YAMLError:
@@ -127,7 +128,7 @@ def test_loading_config_text_only_ever_builds_plain_data(text):
 
 
 @given(st.sampled_from(["!secret", "!env_var"]), st.from_regex(r"[A-Za-z_][A-Za-z0-9_]{0,30}", fullmatch=True))
-def test_secret_and_env_var_tags_are_never_resolved(tag, name):
+def test_secret_and_env_var_tags_are_never_resolved(tag: str, name: str) -> None:
     assert tw.load_yaml(f"api_key: {tag} {name}") == {"api_key": name}
 
 
@@ -218,9 +219,14 @@ config_qps = st.lists(
 
 
 @given(guide_cfs, guide_qps, guide_groups, config_cfs, config_qps, st.lists(group_sections, max_size=2))
-def test_checks_never_crash_on_well_formed_configs_and_guides(
-    cfs_in_guide, qps_in_guide, groups_in_guide, cfs, qps, sections
-):
+def test_checks_never_crash_on_well_formed_configs_and_guides(  # noqa: PLR0913, PLR0917 - one argument per Hypothesis strategy
+    cfs_in_guide: dict[str, dict[str, Any]],
+    qps_in_guide: dict[str, dict[str, Any]],
+    groups_in_guide: dict[str, dict[str, Any]],
+    cfs: list[dict[str, Any]],
+    qps: list[dict[str, Any]],
+    sections: list[dict[str, Any]],
+) -> None:
     for tid, cf in cfs_in_guide.items():
         cf["trash_id"] = tid
     for tid, qp in qps_in_guide.items():
@@ -230,7 +236,7 @@ def test_checks_never_crash_on_well_formed_configs_and_guides(
     guides = {"radarr": {"cf": cfs_in_guide, "qp": qps_in_guide, "groups": groups_in_guide}}
     cfs = cfs + [{"custom_format_groups": s} for s in sections]
     gap_list = []
-    findings, *_ = tw.check("radarr", "movies", cfs, qps, guides, gap_list)
+    findings, *_ = tw.check(("radarr", "movies", cfs, qps), guides, gap_list)
     assert all(isinstance(group, str) and isinstance(item, str) for group, item in findings)
     assert all(gap["score"] is None or type(gap["score"]) is int for gap in gap_list)
     # ...and whatever they find renders and suggests without error

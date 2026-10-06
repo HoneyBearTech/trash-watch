@@ -41,7 +41,9 @@ Recyclarr config against the TRaSH Guides JSON (`TRaSH-Guides/Guides`, `docs/jso
 
 ## Stack
 - Python 3.14 (one script, standard library plus PyYAML), git, Docker Compose. No web UI, no HTTP API.
-- Tooling: ruff (lint and format), yamllint, pytest + coverage (90 % branch floor), Hypothesis (property tests),
+- Tooling: ruff with every rule family (`select = ["ALL"]`, exceptions in `pyproject.toml`; per-line `noqa`
+  with a reason) and `ruff format`; everything type-annotated (aliases `Block`, `Finding`, `Guides`, `Instance`
+  in `trash_watch.py`; `RunChecks`, `EditGuideCf` in `tests/conftest.py`), yamllint, pytest + coverage (90 % branch floor), Hypothesis (property tests),
   Atheris (coverage-guided fuzzing, Linux x86_64 only), pip-tools for the hash-pinned requirements. CI-only: actionlint, hadolint, gitleaks, CodeQL, Scorecard, dependency review.
 - Releases: signed multi-arch images on GHCR (cosign keyless), SBOM, SLSA provenance, signed checksums.
 
@@ -89,7 +91,7 @@ only commit or push it when the owner asks.
 - `Makefile`: `make test` (builds `.venv`, runs pytest), `make build`, `make run-once`, `make suggest`.
   The production host has no `make`; run the target's `docker compose` line there.
 - `--suggest` (`suggest()` / `render_suggestions()`): prints paste-ready `custom_formats` blocks for the gaps
-  `check()` collects. **Console only, by design:** it must never write the config (or anywhere else),
+  `check(instance, guides, gaps)` collects. **Console only, by design:** it must never write the config (or anywhere else),
   notify, or save state. Never add an option that applies the suggestions.
 - `docker-compose.yml`: the one service. Builds from the checkout by default (`TRASH_WATCH_IMAGE` /
   `TRASH_WATCH_PULL_POLICY` switch it to a release image). It reads settings from `.env` (`env_file`) and
