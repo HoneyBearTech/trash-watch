@@ -47,6 +47,7 @@ All notable changes to trash-watch are documented here. The format follows
   sets). The first run after upgrading re-baselines instead of reporting every CF as changed.
 - The image's base is pinned by version and digest, PyYAML is installed with `--require-hashes`, and the
   image now includes `LICENSE`.
+- The image runs Python 3.14 (was 3.12); CI tests on the same version.
 
 ### Security
 

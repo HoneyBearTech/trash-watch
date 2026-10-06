@@ -57,7 +57,7 @@ Everything is also printed to stdout (`docker compose logs trash-watch`): `OK â€
 
 ## Image
 
-Built from the [`Dockerfile`](../Dockerfile): `python:3.12-slim` (pinned by version and digest) with `git`
+Built from the [`Dockerfile`](../Dockerfile): `python:3.14-slim` (pinned by version and digest) with `git`
 and `ca-certificates`, PyYAML installed from the hash-pinned [`requirements.txt`](../requirements.txt), and
 `trash_watch.py` and `LICENSE` in `/app`; it runs `python -u trash_watch.py`. By default compose builds it
 from the checkout. Releases publish it for linux/amd64 and linux/arm64 as `ghcr.io/honeybeartech/trash-watch`,
