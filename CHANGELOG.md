@@ -6,6 +6,10 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-06
+
+The first release.
+
 ### Added
 
 - `--suggest` (`make suggest`): prints paste-ready Recyclarr YAML (trash_ids plus `assign_scores_to` with
@@ -21,7 +25,7 @@ All notable changes to trash-watch are documented here. The format follows
 - Tests (`tests/`, pytest, offline fixtures) for dead trash_ids, missing CFs, score mismatches, upstream
   changes between runs and Recyclarr's `!secret`/`!env_var` tags; `requirements.txt` (pinned PyYAML, now
   used by the image), `requirements-dev.txt` and a `Makefile` (`test`, `build`, `run-once`).
-- Signed releases (planned from 0.1.0): on a version tag, a multi-arch image on GHCR signed keylessly with
+- Signed releases: on a version tag, a multi-arch image on GHCR signed keylessly with
   cosign, with an SBOM and SLSA provenance, and a GitHub Release with a source archive and signed checksums
   ([docs/verifying-releases.md](docs/verifying-releases.md)). `TRASH_WATCH_IMAGE` and
   `TRASH_WATCH_PULL_POLICY` in `.env` run a release image instead of building from the checkout.
@@ -67,3 +71,6 @@ All notable changes to trash-watch are documented here. The format follows
   trash-watch directory, before starting the new version:
   `docker run --rm -v "$PWD/data:/data" busybox chown -R 1000:1000 /data` ([docs/upgrading.md](docs/upgrading.md)).
   Without it, trash-watch stops with an error that names this command.
+
+[Unreleased]: https://github.com/HoneyBearTech/trash-watch/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/HoneyBearTech/trash-watch/releases/tag/v0.1.0

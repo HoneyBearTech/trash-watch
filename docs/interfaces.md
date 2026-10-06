@@ -66,4 +66,4 @@ and `ca-certificates`, PyYAML installed from the hash-pinned [`requirements.txt`
 (uid/gid 1000). By default compose builds it
 from the checkout. Releases publish it for linux/amd64 and linux/arm64 as `ghcr.io/honeybeartech/trash-watch`,
 tagged with the version (`0.1.0`), major.minor (`0.1`) and `latest`, signed and with an SBOM and provenance
-([verifying-releases.md](verifying-releases.md); planned: from the first release).
+([verifying-releases.md](verifying-releases.md)).

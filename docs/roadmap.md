@@ -12,13 +12,13 @@ upstream changes that affect the config. It matches renamed profiles (`PROFILE_M
 honours deliberate choices (`IGNORE`), sends phone-sized notifications to Discord and ntfy, and prints
 paste-ready fixes with `--suggest`. It has offline tests with a coverage floor and CI with linting and
 secret scanning. The container runs unprivileged on a read-only filesystem, and the code that turns
-untrusted names into output is fuzzed (Hypothesis properties driven by Atheris). No release has been tagged yet.
+untrusted names into output is fuzzed (Hypothesis properties driven by Atheris). 0.1.0 (October 2026) is the
+first release: a signed multi-arch image on GHCR with an SBOM and provenance.
 
 ## Over the following year
 
 **Releases and security**
 
-- The first signed release (0.1.0) on GHCR, with SBOM and provenance ([verifying-releases.md](verifying-releases.md)).
 - `RUN_ONCE=1` exiting non-zero when a check fails, so a one-time check can be scripted.
 - A scheduled image scan (Trivy) reported to code scanning.
 - Type annotations throughout, and ruff's full rule set.

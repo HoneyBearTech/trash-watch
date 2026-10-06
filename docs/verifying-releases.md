@@ -13,7 +13,7 @@ workflow when a version tag is pushed. You can check that what you run came from
   for those files (`trash-watch-<version>.provenance.sigstore.json`, also stored by GitHub);
 - the **version tag** in git is signed with the maintainer's SSH key.
 
-Planned: no release has been tagged yet; this applies from 0.1.0. You need
+This applies to every release, starting with 0.1.0. You need
 [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3.0 or later (with cosign 2.6, add
 `--new-bundle-format` to `cosign verify`). The examples use version 0.1.0; substitute the one you run.
 
