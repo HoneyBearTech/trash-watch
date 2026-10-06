@@ -42,7 +42,7 @@ Every push and pull request runs one CI job, "Checks + tests"
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), which is the required check on `main`. It runs
 the linters below, a gitleaks scan of the whole history, the unit tests with a coverage floor, builds the
 image and starts it, and validates the compose file. CodeQL, dependency review, a DCO check and OpenSSF
-Scorecard also run on the repository.
+Scorecard also run on the repository, and Trivy scans the image weekly for known vulnerabilities.
 
 The tests are offline: they run against small fixtures in [`tests/fixtures/`](tests/fixtures/) (a fake
 guides tree and a fake Recyclarr config), a local git repository stands in for GitHub, and any attempt to

@@ -75,7 +75,7 @@ only commit or push it when the owner asks.
 - `pyproject.toml`: ruff rules, pytest options (warnings are errors), coverage floor. `.yamllint.yml`.
 - `.github/`: `ci.yml` (one job, "Checks + tests", the required check: ruff, yamllint, actionlint, hadolint,
   gitleaks over the history, pytest + coverage, image build/start, compose config), `codeql.yml`,
-  `scorecard.yml`, `dependency-review.yml`, `dco.yml`, `fuzz.yml` (Atheris per target: 60 s on PRs touching the
+  `scorecard.yml`, `dependency-review.yml`, `dco.yml`, `scan.yml` (weekly Trivy scan of the `main` build and the latest GHCR release → code scanning), `fuzz.yml` (Atheris per target: 60 s on PRs touching the
   code, 10 min weekly; not a required check), `release.yml` (on a `v*.*.*` tag: multi-arch image to
   GHCR, cosign keyless, SBOM + provenance, GitHub Release from the tag's `CHANGELOG.md` section, signed
   `SHA256SUMS`); `dependabot.yml`; issue/PR templates; `CODEOWNERS`; `allowed_signers` (tag-signing key).

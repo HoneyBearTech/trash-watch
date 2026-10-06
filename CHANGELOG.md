@@ -6,6 +6,15 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- The image applies Debian's security updates when it's built and no longer contains pip, which fixes 11
+  HIGH-severity vulnerabilities in the 0.1.0 image: OpenSSL (CVE-2026-75804, CVE-2026-84782) and PCRE2
+  (CVE-2026-103111), plus urllib3, msgpack and setuptools' `pkg_resources` vendored inside pip (never run
+  by trash-watch). Upgrade by pulling the new image.
+- A weekly image scan (Trivy) of the image built from `main` and of the latest release, reported to code
+  scanning (`scan.yml`).
+
 ## [0.1.0] - 2026-10-06
 
 The first release.

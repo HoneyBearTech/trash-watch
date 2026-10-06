@@ -87,7 +87,7 @@ notifiers (only their status matters). The full list of settings, mounts and con
 | Incorrect logic hiding drift | Each check has a fixture case; an exact-findings test catches new false positives; profile coverage is logged on every run | [`tests/`](../tests/); `test_exactly_the_expected_findings`, `test_unmatched_and_ignored_profiles_are_logged_not_silently_skipped` |
 | Inclusion of functionality from an untrusted source (CWE-829, CWE-494) | Digest-pinned base image, hash-pinned packages, SHA-pinned Actions; signed releases | [`Dockerfile`](../Dockerfile), [`requirements.txt`](../requirements.txt), the workflows; OpenSSF Scorecard (Pinned-Dependencies) |
 | Injection into CI scripts (CWE-78, CWE-94) | Untrusted values reach `run:` scripts only through `env:`; no `pull_request_target` | actionlint and shellcheck in CI; CodeQL for Actions |
-| Use of components with known vulnerabilities (CWE-1395) | Dependabot for the base image, packages and Actions; dependency review on pull requests | [dependencies.md](dependencies.md) |
+| Use of components with known vulnerabilities (CWE-1395) | Weekly Trivy scan of the `main` build and the latest release to code scanning; Debian security updates applied at build time; pip removed from the image; Dependabot for the base image, packages and Actions; dependency review on pull requests | [dependencies.md](dependencies.md) |
 
 ## 5. Verification evidence
 
@@ -96,7 +96,7 @@ On every push and pull request, CI ([`.github/workflows/ci.yml`](../.github/work
 gitleaks over the full history, the unit and property tests (Hypothesis) with a 90 % branch-coverage floor, an image build and start,
 and a compose-file check. CodeQL analyses the Python code and the workflows on every change and weekly;
 dependency review and a DCO check run on every pull request; Atheris fuzzes the property tests on pull
-requests that change the code and for ten minutes per target weekly; OpenSSF Scorecard scores the repository
+requests that change the code and for ten minutes per target weekly; Trivy scans the image weekly; OpenSSF Scorecard scores the repository
 weekly. Releases are signed and carry an SBOM and provenance.
 
 This document is reviewed when the threat model changes: a new input or output, a new kind of secret, any

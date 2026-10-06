@@ -20,7 +20,6 @@ first release: a signed multi-arch image on GHCR with an SBOM and provenance.
 **Releases and security**
 
 - `RUN_ONCE=1` exiting non-zero when a check fails, so a one-time check can be scripted.
-- A scheduled image scan (Trivy) reported to code scanning.
 - Type annotations throughout, and ruff's full rule set.
 
 **Security and project health**
