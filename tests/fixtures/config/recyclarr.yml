@@ -1,0 +1,22 @@
+# Fixture Recyclarr config. Each block exists to produce one known finding against the
+# fixture guides in ../guides (see tests/test_trash_watch.py).
+radarr:
+  movies:
+    base_url: !env_var RADARR_URL
+    api_key: !secret radarr_api_key
+    quality_profiles:
+      # Matches the guide's "[SQP] SQP-1 (1080p)" by name (the "[SQP] " prefix is optional).
+      # The guide profile also lists x265 (HD), which nothing below scores -> "missing x265 (HD)".
+      - name: SQP-1 (1080p)
+        score_set: sqp-1-1080p
+    custom_formats:
+      - trash_ids:
+          - a0000000000000000000000000000002 # Repack/Proper: guide says 6 in sqp-1-1080p
+        assign_scores_to:
+          - name: SQP-1 (1080p)
+            score: 99
+      - trash_ids:
+          - a0000000000000000000000000000003 # BR-DISK
+          - deadbeefdeadbeefdeadbeefdeadbeef # not in the guides -> dead trash_id
+        assign_scores_to:
+          - name: SQP-1 (1080p)

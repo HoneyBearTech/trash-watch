@@ -1,0 +1,18 @@
+{
+  "trash_id": "a0000000000000000000000000000003",
+  "trash_scores": {
+    "default": -10000,
+    "french-vostfr": -10000
+  },
+  "name": "BR-DISK",
+  "includeCustomFormatWhenRenaming": false,
+  "specifications": [
+    {
+      "name": "BR-DISK",
+      "implementation": "ReleaseTitleSpecification",
+      "negate": false,
+      "required": true,
+      "fields": { "value": "^(?!.*\\b((?<!HD[._ -]|HD)DVD|BDRip)\\b).*?\\b(COMPLETE|ISO|BDISO)\\b" }
+    }
+  ]
+}

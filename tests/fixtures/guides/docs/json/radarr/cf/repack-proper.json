@@ -1,0 +1,18 @@
+{
+  "trash_id": "a0000000000000000000000000000002",
+  "trash_scores": {
+    "default": 5,
+    "sqp-1-1080p": 6
+  },
+  "name": "Repack/Proper",
+  "includeCustomFormatWhenRenaming": false,
+  "specifications": [
+    {
+      "name": "Repack",
+      "implementation": "ReleaseTitleSpecification",
+      "negate": false,
+      "required": false,
+      "fields": { "value": "\\b(repack)\\b" }
+    }
+  ]
+}

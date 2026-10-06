@@ -1,0 +1,18 @@
+{
+  "trash_id": "b0000000000000000000000000000001",
+  "name": "[SQP] SQP-1 (1080p)",
+  "trash_score_set": "sqp-1-1080p",
+  "trash_description": "Fixture profile for tests.",
+  "upgradeAllowed": true,
+  "cutoff": "Bluray-1080p",
+  "minFormatScore": 0,
+  "items": [
+    { "name": "Bluray-1080p", "allowed": true },
+    { "name": "WEBDL-1080p", "allowed": true }
+  ],
+  "formatItems": {
+    "x265 (HD)": "a0000000000000000000000000000001",
+    "Repack/Proper": "a0000000000000000000000000000002",
+    "BR-DISK": "a0000000000000000000000000000003"
+  }
+}
