@@ -1,0 +1,31 @@
+version: 2
+# Update PRs are reviewed and merged by hand, never auto-merged: CI must pass, and a base-image or
+# PyYAML bump is worth a one-time check against a real Recyclarr config (make run-once) first.
+updates:
+  # The base image in the Dockerfile (version tag and digest).
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees: ["HoneyBearTech"]
+
+  # Runtime (requirements.txt) and the check and test tools (requirements-dev.txt), pinned with hashes.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees: ["HoneyBearTech"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees: ["HoneyBearTech"]
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
