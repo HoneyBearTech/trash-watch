@@ -15,17 +15,21 @@ Recyclarr app-data dir ──read-only mount──▶ /config ──────
 1. **Sync the guides.** The first run makes a shallow, sparse clone of `TRaSH-Guides/Guides` that holds
    only `docs/json`. Later runs fetch and hard-reset it to the latest upstream commit. That clone is the
    only thing trash-watch writes besides `state.json`.
-2. **Load the guides.** For `radarr` and `sonarr`: every custom format (`cf/*.json`) and quality profile
-   (`quality-profiles/*.json`), keyed by `trash_id`.
+2. **Load the guides.** For `radarr` and `sonarr`: every custom format (`cf/*.json`), quality profile
+   (`quality-profiles/*.json`) and CF group (`cf-groups/*.json`), keyed by `trash_id`.
 3. **Load the config.** It reads `recyclarr.yml` or `recyclarr.yaml` and `configs/*.yml` under `/config`.
    For each Radarr and Sonarr instance it collects `custom_formats` and `quality_profiles`, including those
    from includes: local `include: - config:` files (relative paths resolve under `includes/`) and
    `include: - template:` ones, looked up in the `includes.json` of Recyclarr's copy of the
    config-templates repo. A profile that's only named in `assign_scores_to` counts as a profile too.
+   Recyclarr v8 `custom_format_groups` are resolved the way Recyclarr does: a group adds its required CFs,
+   its defaults minus `exclude`, and `select` (or every optional CF with `select_all`); those CFs are scored
+   in the profiles named in the group's `assign_scores_to`, or else the guide-backed profiles the group is
+   meant for. Default groups count for those guide-backed profiles too, unless listed under `skip`.
    Recyclarr's `!secret` and `!env_var` tags are accepted, and their values are never used.
 4. **Check each instance** (below). The log gets one line per profile saying what it was checked against,
    that it was ignored, or that it matched nothing and was **not checked**, plus a `warning:` for an
-   include it couldn't find or an instance key it doesn't understand (such as `custom_format_groups`).
+   include it couldn't find or an instance key it doesn't understand.
 5. **Compare with the last run** and notify if the findings changed. Then it saves `data/state.json`.
 
 Then it sleeps for `INTERVAL_HOURS`, or exits if `RUN_ONCE=1`. If a run fails, it sends a
@@ -64,7 +68,9 @@ Findings are grouped under a heading: the instance (`radarr/movies`), the instan
 | profile | `<CF>: synced, but not scored in this profile` | The CF is in the instance, but no block that's assigned to this profile lists it, so the profile scores it 0. |
 | profile | `score_set X, guide uses Y` | Your profile takes its scores from a different score set than the guide profile it matches. |
 | profile | `<CF>: N, guide M` | A score in `assign_scores_to` differs from the guide's score in your profile's `score_set` (falling back to `default`). Ignore it if it's intentional. |
-| `<app> · changed upstream` | `CF <name>` / `Profile <name>` | The JSON of a CF or profile you use changed since the last run. Run `recyclarr sync --preview` to see what that does to your setup. |
+| instance | `CF group <id> removed or renamed upstream` | A `custom_format_groups` entry names a group the guides no longer have. |
+| instance | `CF <id> under select is no longer in group <name>` (or `exclude`) | The group no longer contains that CF, so the line does nothing. |
+| `<app> · changed upstream` | `CF <name>` / `Profile <name>` / `CF group <name>` | The JSON of a CF, profile or CF group you use changed since the last run. Run `recyclarr sync --preview` to see what that does to your setup. |
 
 Guide-backed profiles (those with a `trash_id`) only get the first two checks: Recyclarr syncs their CFs
 and scores from the guide itself.

@@ -156,6 +156,24 @@ guide_qps = st.dictionaries(
     ),
     max_size=3,
 )
+group_ids = st.sampled_from(["g1", "g2", "g3"])
+guide_groups = st.dictionaries(
+    group_ids,
+    st.fixed_dictionaries(
+        {
+            "name": any_text,
+            "custom_formats": st.lists(
+                st.fixed_dictionaries(
+                    {"trash_id": ids, "required": st.booleans()}, optional={"default": st.booleans()}
+                ),
+                max_size=4,
+            ),
+            "quality_profiles": st.fixed_dictionaries({"include": st.dictionaries(any_text, ids, max_size=2)}),
+        },
+        optional={"default": st.sampled_from(["true", "false", True])},
+    ),
+    max_size=3,
+)
 profile_names = st.one_of(any_text, st.sampled_from(["SQP-1", "sqp-1"]))
 config_cfs = st.lists(
     st.fixed_dictionaries(
@@ -172,6 +190,24 @@ config_cfs = st.lists(
     ),
     max_size=3,
 )
+group_sections = st.fixed_dictionaries(
+    {},
+    optional={
+        "add": st.lists(
+            st.fixed_dictionaries(
+                {"trash_id": group_ids},
+                optional={
+                    "select": st.lists(ids, max_size=3),
+                    "exclude": st.lists(ids, max_size=3),
+                    "select_all": st.booleans(),
+                    "assign_scores_to": st.lists(st.fixed_dictionaries({"name": profile_names}), max_size=2),
+                },
+            ),
+            max_size=3,
+        ),
+        "skip": st.lists(group_ids, max_size=2),
+    },
+)
 config_qps = st.lists(
     st.one_of(
         st.fixed_dictionaries({"name": profile_names}, optional={"score_set": score_sets}),
@@ -181,13 +217,18 @@ config_qps = st.lists(
 )
 
 
-@given(guide_cfs, guide_qps, config_cfs, config_qps)
-def test_checks_never_crash_on_well_formed_configs_and_guides(cfs_in_guide, qps_in_guide, cfs, qps):
+@given(guide_cfs, guide_qps, guide_groups, config_cfs, config_qps, st.lists(group_sections, max_size=2))
+def test_checks_never_crash_on_well_formed_configs_and_guides(
+    cfs_in_guide, qps_in_guide, groups_in_guide, cfs, qps, sections
+):
     for tid, cf in cfs_in_guide.items():
         cf["trash_id"] = tid
     for tid, qp in qps_in_guide.items():
         qp["trash_id"] = tid
-    guides = {"radarr": {"cf": cfs_in_guide, "qp": qps_in_guide}}
+    for gid, group in groups_in_guide.items():
+        group["trash_id"] = gid
+    guides = {"radarr": {"cf": cfs_in_guide, "qp": qps_in_guide, "groups": groups_in_guide}}
+    cfs = cfs + [{"custom_format_groups": s} for s in sections]
     gap_list = []
     findings, *_ = tw.check("radarr", "movies", cfs, qps, guides, gap_list)
     assert all(isinstance(group, str) and isinstance(item, str) for group, item in findings)

@@ -1,0 +1,12 @@
+{
+  "name": "[Misc] Fixture defaults",
+  "trash_id": "c0000000000000000000000000000002",
+  "trash_description": "Fixture group Recyclarr syncs by default for the SQP-1 guide profile.",
+  "default": "true",
+  "custom_formats": [
+    { "name": "Repack/Proper", "trash_id": "a0000000000000000000000000000002", "required": false, "default": true }
+  ],
+  "quality_profiles": {
+    "include": { "[SQP] SQP-1 (1080p)": "b0000000000000000000000000000001" }
+  }
+}

@@ -106,7 +106,10 @@ Config the watcher reads (under `/config`): `recyclarr.yml` or `recyclarr.yaml`,
 local `include: - config:` files (relative paths resolve under `includes/`), and `template:` includes via
 the `includes.json` in Recyclarr's config-templates checkout (`resources/config-templates/git/official` or
 `repositories/config-templates`). The `!secret` and `!env_var` tags are accepted and their values ignored.
-Renamed profiles are matched with `PROFILE_MAP` (or a unique `score_set`); deliberate skips go in `IGNORE`.
+Recyclarr v8 `custom_format_groups` (also from includes) ride through `load_instances()` as marker blocks and
+`resolve_groups()` turns them into ordinary CF blocks using the guides' `cf-groups/` (required + defaults −
+exclude + select/select_all; `assign_scores_to`, else the guide-backed profiles in the group's include list;
+default groups for those unless skipped). Renamed profiles are matched with `PROFILE_MAP` (or a unique `score_set`); deliberate skips go in `IGNORE`.
 Every run logs which guide profile each config profile was checked against. Check that output after a
 change: a profile marked "NOT CHECKED" is silently missing from the findings.
 
