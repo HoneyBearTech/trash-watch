@@ -3,7 +3,7 @@
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 # pyflakes/pycodestyle, bugbear, the bandit security rules (S), pylint errors and warnings, and the

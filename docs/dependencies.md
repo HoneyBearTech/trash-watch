@@ -23,7 +23,7 @@ always gets the same bytes:
 
 | Dependency | Declared in | Pinned by | Fetched by |
 | --- | --- | --- | --- |
-| Base image (`python:3.12-slim`, which brings Python and Debian) | [`Dockerfile`](../Dockerfile) | version tag and multi-arch digest | Docker / BuildKit |
+| Base image (`python:3.14-slim`, which brings Python and Debian) | [`Dockerfile`](../Dockerfile) | version tag and multi-arch digest | Docker / BuildKit |
 | git, ca-certificates | [`Dockerfile`](../Dockerfile) | the base image's Debian release | apt |
 | PyYAML (runtime) | [`requirements.in`](../requirements.in) → [`requirements.txt`](../requirements.txt) | exact version and SHA-256 hashes (`pip-compile --generate-hashes`) | `pip install --require-hashes --no-deps` |
 | Check and test tools (pytest, coverage, ruff, yamllint, PyYAML) | [`requirements-dev.in`](../requirements-dev.in) → [`requirements-dev.txt`](../requirements-dev.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` |
