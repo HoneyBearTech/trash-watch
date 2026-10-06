@@ -24,11 +24,13 @@ def test_score_mismatch_uses_the_profiles_score_set(findings):
 
 
 def test_exactly_the_expected_findings(findings):
-    assert sorted(findings()) == sorted([
-        ("radarr/movies", "CF deadbeefdeadbeefdeadbeefdeadbeef removed or renamed upstream"),
-        (SQP1, "missing x265 (HD)"),
-        (SQP1, "Repack/Proper: 99, guide 6"),
-    ])
+    assert sorted(findings()) == sorted(
+        [
+            ("radarr/movies", "CF deadbeefdeadbeefdeadbeefdeadbeef removed or renamed upstream"),
+            (SQP1, "missing x265 (HD)"),
+            (SQP1, "Repack/Proper: 99, guide 6"),
+        ]
+    )
 
 
 def test_ignore_skips_a_deliberately_missing_cf(findings, monkeypatch):
@@ -49,8 +51,12 @@ def test_upstream_change_detected_between_two_runs(notifications, edit_guide_cf)
 def test_unrelated_upstream_edit_is_not_a_change(notifications, edit_guide_cf):
     tw.run_once()
     # A score set no profile here uses, and the description link, don't affect this config
-    edit_guide_cf("br-disk.json", lambda cf: cf.update(trash_scores={**cf["trash_scores"], "french-vostfr": -5},
-                                                       trash_regex="https://example.invalid"))
+    edit_guide_cf(
+        "br-disk.json",
+        lambda cf: cf.update(
+            trash_scores={**cf["trash_scores"], "french-vostfr": -5}, trash_regex="https://example.invalid"
+        ),
+    )
     tw.run_once()
 
     assert len(notifications) == 1  # findings unchanged, so the second run sent nothing
@@ -61,7 +67,7 @@ def test_secret_and_env_var_tags_load_without_being_resolved(workspace, findings
     with pytest.raises(yaml.constructor.ConstructorError):
         yaml.safe_load(text)  # plain YAML rejects Recyclarr's custom tags
 
-    doc = yaml.load(text, Loader=tw.Loader)
+    doc = tw.load_yaml(text)
     movies = doc["radarr"]["movies"]
     assert movies["api_key"] == "radarr_api_key"  # the secret's name, never its value
     assert movies["base_url"] == "RADARR_URL"
@@ -76,10 +82,12 @@ def test_suggest_prints_paste_ready_yaml_for_missing_cf(capsys):
     assert "# radarr/movies · SQP-1 (1080p) (guide: [SQP] SQP-1 (1080p), score_set sqp-1-1080p)" in out
     assert "# paste under:  radarr: > movies: > custom_formats:" in out
     # The output is valid YAML: exactly the block to add, scored with the guide's score for the profile
-    assert yaml.safe_load(out) == [{
-        "trash_ids": [X265_HD],
-        "assign_scores_to": [{"name": "SQP-1 (1080p)", "score": -10000}],
-    }]
+    assert yaml.safe_load(out) == [
+        {
+            "trash_ids": [X265_HD],
+            "assign_scores_to": [{"name": "SQP-1 (1080p)", "score": -10000}],
+        }
+    ]
 
 
 def test_suggest_only_prints(workspace, notifications, capsys):
@@ -102,15 +110,27 @@ def test_suggest_respects_ignore(capsys, monkeypatch):
 
 def test_suggestions_grouped_by_profile_and_score():
     def gap(profile, tid, cf, score, synced=False):
-        return {"app": "sonarr", "instance": "series", "profile": profile, "guide": "WEB-1080p",
-                "score_set": "default", "trash_id": tid, "cf": cf, "score": score, "synced": synced}
+        return {
+            "app": "sonarr",
+            "instance": "series",
+            "profile": profile,
+            "guide": "WEB-1080p",
+            "score_set": "default",
+            "trash_id": tid,
+            "cf": cf,
+            "score": score,
+            "synced": synced,
+        }
 
-    text = tw.render_suggestions([
-        gap("WEB: 1080p", "c1" * 16, "AV1", -10000),
-        gap("WEB: 1080p", "c2" * 16, "BR-DISK", -10000, synced=True),
-        gap("WEB: 1080p", "c3" * 16, "Repack/Proper", 5),
-        gap("Anime", "c4" * 16, "VOSTFR", None),
-    ], "abc1234")
+    text = tw.render_suggestions(
+        [
+            gap("WEB: 1080p", "c1" * 16, "AV1", -10000),
+            gap("WEB: 1080p", "c2" * 16, "BR-DISK", -10000, synced=True),
+            gap("WEB: 1080p", "c3" * 16, "Repack/Proper", 5),
+            gap("Anime", "c4" * 16, "VOSTFR", None),
+        ],
+        "abc1234",
+    )
 
     assert yaml.safe_load(text) == [
         {"trash_ids": ["c4" * 16], "assign_scores_to": [{"name": "Anime"}]},  # no guide score: none set

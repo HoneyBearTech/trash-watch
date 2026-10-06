@@ -16,6 +16,8 @@ and passes every line into the container.
 | `PROFILE_MAP` | `{}` | JSON object (one line, single-quoted) mapping your profile name to a guide quality profile's `trash_id` or exact name, e.g. `'{"Movies 4K": "<trash_id>"}'`. |
 | `IGNORE` | empty | Comma-separated `trash_id`s (CFs or guide profiles) and profile names to skip on purpose, e.g. `dc98083864ea246d05a42df0d05f81cc,My Profile`. No quotes, no comment on the same line. |
 | `RUN_ONCE` | unset | `1` = one check, then exit. Pass with `docker compose run -e RUN_ONCE=1`; never put it in `.env`. |
+| `TRASH_WATCH_IMAGE` | `trash-watch:local` | Compose only: the image to run. Leave unset to build from the checkout, or set a release such as `ghcr.io/honeybeartech/trash-watch:0.1.0` ([verifying-releases.md](verifying-releases.md)). |
+| `TRASH_WATCH_PULL_POLICY` | `build` | Compose only: `build` builds from the checkout on every start; `always` pulls `TRASH_WATCH_IMAGE` instead. |
 
 The script also reads `DATA_DIR` (default `/data`) and `CONFIG_ROOT` (default `/config`). They're the
 container-side paths the compose mounts use, so don't set them in `.env`.
@@ -55,5 +57,9 @@ Everything is also printed to stdout (`docker compose logs trash-watch`): `OK â€
 
 ## Image
 
-Built locally from the [`Dockerfile`](../Dockerfile): `python:3.12-slim` with `git`, `ca-certificates` and
-`pyyaml`, running `python -u trash_watch.py`. Nothing is published to a registry.
+Built from the [`Dockerfile`](../Dockerfile): `python:3.12-slim` (pinned by version and digest) with `git`
+and `ca-certificates`, PyYAML installed from the hash-pinned [`requirements.txt`](../requirements.txt), and
+`trash_watch.py` and `LICENSE` in `/app`; it runs `python -u trash_watch.py`. By default compose builds it
+from the checkout. Releases publish it for linux/amd64 and linux/arm64 as `ghcr.io/honeybeartech/trash-watch`,
+tagged with the version (`0.1.0`), major.minor (`0.1`) and `latest`, signed and with an SBOM and provenance
+([verifying-releases.md](verifying-releases.md); planned: from the first release).

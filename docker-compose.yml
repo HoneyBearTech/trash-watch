@@ -1,6 +1,10 @@
 services:
   trash-watch:
+    # By default the image is built from this checkout. To run a signed release instead, set
+    # TRASH_WATCH_IMAGE=ghcr.io/honeybeartech/trash-watch:<version> and TRASH_WATCH_PULL_POLICY=always in .env.
+    image: ${TRASH_WATCH_IMAGE:-trash-watch:local}
     build: .
+    pull_policy: ${TRASH_WATCH_PULL_POLICY:-build}
     container_name: trash-watch
     restart: unless-stopped
     env_file: .env    # settings + secrets, never committed; template: .env.example

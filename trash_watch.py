@@ -11,6 +11,7 @@ Reports:
 Only notifies when the findings change, so it won't spam you daily. Anything listed in IGNORE is skipped;
 profiles it can't match to a guide profile are listed in the log on every run.
 """
+
 import argparse
 import hashlib
 import json
@@ -39,32 +40,48 @@ APPS = ("radarr", "sonarr")
 # Where Recyclarr keeps the config-templates repo (v8, then v7 layout); only one with includes.json is used
 TEMPLATE_REPOS = ("resources/config-templates/git/official", "repositories/config-templates")
 # Instance keys that don't affect what's checked; anything else unknown is logged as not understood
-KNOWN_KEYS = {"base_url", "api_key", "custom_formats", "quality_profiles", "include", "quality_definition",
-              "delete_old_custom_formats", "replace_existing_custom_formats", "media_naming",
-              "media_management"}
+KNOWN_KEYS = {
+    "base_url",
+    "api_key",
+    "custom_formats",
+    "quality_profiles",
+    "include",
+    "quality_definition",
+    "delete_old_custom_formats",
+    "replace_existing_custom_formats",
+    "media_naming",
+    "media_management",
+}
 STATE_VERSION = 2  # bump when fingerprints change shape: the next run re-baselines instead of alerting
 MAX_LINES = 20  # notification body cap, so it reads on a phone; the log always gets everything
-PER_GROUP = 3   # items shown per profile in a notification, so one busy profile can't hide the rest
+PER_GROUP = 3  # items shown per profile in a notification, so one busy profile can't hide the rest
 
 
 class Loader(yaml.SafeLoader):
-    pass
+    """SafeLoader that also accepts Recyclarr's !secret and !env_var tags, as their names (never resolved)."""
 
 
-for _tag in ("!secret", "!env_var"):  # Recyclarr-specific tags; values are irrelevant here
-    Loader.add_constructor(_tag, lambda loader, node: str(node.value))
+for _tag in ("!secret", "!env_var"):
+    Loader.add_constructor(_tag, lambda _loader, node: str(node.value))
 
 
-def git(*args):
-    return subprocess.run(["git", *args], cwd=CACHE, check=True,
-                          capture_output=True, text=True).stdout.strip()
+def load_yaml(text):
+    return yaml.load(text, Loader=Loader)  # noqa: S506 - Loader is a SafeLoader subclass (see above)
+
+
+# git runs with fixed arguments (no shell); the only variable parts are this script's own paths and
+# GUIDES_REPO. It's found on PATH, as installed in the image.
+def git(*args, cwd=None):
+    command = ["git", *args]
+    result = subprocess.run(command, cwd=cwd or CACHE, check=True, capture_output=True, text=True)  # noqa: S603
+    return result.stdout.strip()
 
 
 def sync_guides():
     if not (CACHE / ".git").exists():
         DATA.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["git", "clone", "-q", "--depth", "1", "--filter=blob:none",
-                        "--sparse", GUIDES_REPO, str(CACHE)], check=True)
+        clone = ("clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse", GUIDES_REPO, str(CACHE))
+        git(*clone, cwd=DATA)
         git("sparse-checkout", "set", "docs/json")
     else:
         git("fetch", "-q", "--depth", "1", "origin")
@@ -77,8 +94,7 @@ def load_guides():
     for app in APPS:
         base = CACHE / "docs/json" / app
         guides[app] = {
-            kind: {d["trash_id"]: d for d in
-                   (json.loads(f.read_text()) for f in (base / folder).glob("*.json"))}
+            kind: {d["trash_id"]: d for d in (json.loads(f.read_text()) for f in (base / folder).glob("*.json"))}
             for kind, folder in (("cf", "cf"), ("qp", "quality-profiles"))
         }
     return guides
@@ -108,10 +124,10 @@ def load_instances(warnings):
     merged in. Anything that can't be read or isn't understood goes to warnings (log only)."""
     instances = []
     for f in config_files():
-        doc = yaml.load(f.read_text(), Loader=Loader) or {}
+        doc = load_yaml(f.read_text()) or {}
         for app in APPS:
-            for name, inst in (doc.get(app) or {}).items():
-                inst = inst or {}
+            for name, settings in (doc.get(app) or {}).items():
+                inst = settings or {}
                 tag = f"{app}/{name}"
                 cfs = list(inst.get("custom_formats") or [])
                 qps = list(inst.get("quality_profiles") or [])
@@ -124,15 +140,18 @@ def load_instances(warnings):
                     else:
                         p = None
                     if not (p and p.exists()):
-                        warnings.append(f"{tag}: include {inc} not found; CFs it adds aren't counted, "
-                                        f"so 'missing' findings for this instance may be wrong")
+                        warnings.append(
+                            f"{tag}: include {inc} not found; CFs it adds aren't counted, "
+                            f"so 'missing' findings for this instance may be wrong"
+                        )
                         continue
-                    d = yaml.load(p.read_text(), Loader=Loader) or {}
+                    d = load_yaml(p.read_text()) or {}
                     cfs += d.get("custom_formats") or []
                     qps += d.get("quality_profiles") or []
                 for key in sorted(set(inst) - KNOWN_KEYS):
-                    warnings.append(f"{tag}: '{key}' isn't understood by trash-watch; "
-                                    f"findings for this instance may be incomplete")
+                    warnings.append(
+                        f"{tag}: '{key}' isn't understood by trash-watch; findings for this instance may be incomplete"
+                    )
                 # Profiles that are only scored (defined in the app, not in quality_profiles) count too
                 named = {qp.get("name") for qp in qps}
                 for block in cfs:
@@ -197,8 +216,10 @@ def check(app, inst, cfs, qps, guides, gaps=None):
         if not gq:
             if qp.get("trash_id"):
                 findings.append((group, "profile trash_id not found upstream"))
-            coverage.append(f"{tag} · {label}: NOT CHECKED, no guide profile matches "
-                            f"(add it to PROFILE_MAP, or to IGNORE if it's your own)")
+            coverage.append(
+                f"{tag} · {label}: NOT CHECKED, no guide profile matches "
+                f"(add it to PROFILE_MAP, or to IGNORE if it's your own)"
+            )
             continue
         coverage.append(f"{tag} · {label}: checked against {gq['name']} (matched by {how})")
         used_qps.add(gq["trash_id"])
@@ -219,12 +240,26 @@ def check(app, inst, cfs, qps, guides, gaps=None):
         for cf_name, tid in gq.get("formatItems", {}).items():
             if tid in IGNORE or tid in scored:
                 continue
-            findings.append((group, f"{cf_name}: synced, but not scored in this profile" if tid in used_cfs
-                             else f"missing {cf_name}"))
+            findings.append(
+                (
+                    group,
+                    f"{cf_name}: synced, but not scored in this profile" if tid in used_cfs else f"missing {cf_name}",
+                )
+            )
             if gaps is not None:
-                gaps.append({"app": app, "instance": inst, "profile": qp.get("name"), "guide": gq["name"],
-                             "score_set": score_set, "trash_id": tid, "cf": cf_name,
-                             "score": guide_score(g["cf"].get(tid), score_set), "synced": tid in used_cfs})
+                gaps.append(
+                    {
+                        "app": app,
+                        "instance": inst,
+                        "profile": qp.get("name"),
+                        "guide": gq["name"],
+                        "score_set": score_set,
+                        "trash_id": tid,
+                        "cf": cf_name,
+                        "score": guide_score(g["cf"].get(tid), score_set),
+                        "synced": tid in used_cfs,
+                    }
+                )
         for tid, score in scored.items():
             if score is None or tid in IGNORE or tid not in g["cf"]:
                 continue
@@ -238,9 +273,13 @@ def cf_fingerprint(cf, score_sets):
     """What a CF does for you: its conditions, rename flag, and its scores in the sets you use. Upstream
     edits to descriptions, links or other languages' score sets don't count as a change."""
     scores = cf.get("trash_scores", {})
-    return digest({"specifications": cf.get("specifications"),
-                   "includeCustomFormatWhenRenaming": cf.get("includeCustomFormatWhenRenaming"),
-                   "scores": {s: scores.get(s, scores.get("default")) for s in sorted(score_sets)}})
+    return digest(
+        {
+            "specifications": cf.get("specifications"),
+            "includeCustomFormatWhenRenaming": cf.get("includeCustomFormatWhenRenaming"),
+            "scores": {s: scores.get(s, scores.get("default")) for s in sorted(score_sets)},
+        }
+    )
 
 
 def qp_fingerprint(qp):
@@ -266,8 +305,10 @@ def render(findings, max_lines=None, max_chars=None, bold=False):
         block = [f"**{group}**" if bold else group] + [f"• {i}" for i in shown]
         if len(items) > len(shown):
             block.append(f"• +{len(items) - len(shown)} more")
-        if ((max_lines and len(lines) + len(block) > max_lines - 1)  # keep a line for the footer
-                or (max_chars and len("\n".join(lines + block)) > max_chars - 80)):
+        if (
+            (max_lines and len(lines) + len(block) > max_lines - 1)  # keep a line for the footer
+            or (max_chars and len("\n".join(lines + block)) > max_chars - 80)
+        ):
             hidden = sum(len(groups[g]) for g in order[n:])
             lines.append(f"…plus {hidden} more (full list: docker logs trash-watch)")
             break
@@ -276,10 +317,13 @@ def render(findings, max_lines=None, max_chars=None, bold=False):
 
 
 def post(name, url, data, headers):
+    if not url.lower().startswith(("https://", "http://")):  # no file: or other schemes from a typo'd .env
+        print(f"notify via {name} skipped: the URL must start with https:// or http://", flush=True)
+        return
+    request = urllib.request.Request(url, data=data, headers={"User-Agent": "trash-watch/1.0", **headers})  # noqa: S310 - scheme checked above
     try:
-        urllib.request.urlopen(urllib.request.Request(
-            url, data=data, headers={"User-Agent": "trash-watch/1.0", **headers}), timeout=15)
-    except Exception as e:  # never let a notify failure kill the loop, or skip the other target
+        urllib.request.urlopen(request, timeout=15)  # noqa: S310 - scheme checked above
+    except Exception as e:  # noqa: BLE001 - never let a notify failure kill the loop, or skip the other target
         print(f"notify via {name} failed: {e}", flush=True)
 
 
@@ -291,8 +335,12 @@ def notify(title, findings=(), text=None):
     if DISCORD_WEBHOOK:
         head = f"**{title}**\n"
         body = text or render(findings, MAX_LINES, 2000 - len(head), bold=True)
-        post("Discord", DISCORD_WEBHOOK, json.dumps({"content": (head + body)[:2000]}).encode(),
-             {"Content-Type": "application/json"})
+        post(
+            "Discord",
+            DISCORD_WEBHOOK,
+            json.dumps({"content": (head + body)[:2000]}).encode(),
+            {"Content-Type": "application/json"},
+        )
 
 
 def yaml_scalar(value):
@@ -308,18 +356,23 @@ def yaml_scalar(value):
 def render_suggestions(gaps, commit):
     """Recyclarr custom_formats blocks for the gaps, one per profile and guide score, indented to paste
     under an instance's custom_formats: list. Text only; the caller prints it."""
-    out = [f"# trash-watch --suggest @ TRaSH Guides {commit}. Nothing has been written to your config.",
-           "# Review each block, paste it into that instance's custom_formats: list, then run",
-           "# `recyclarr sync --preview` before `recyclarr sync`."]
+    out = [
+        f"# trash-watch --suggest @ TRaSH Guides {commit}. Nothing has been written to your config.",
+        "# Review each block, paste it into that instance's custom_formats: list, then run",
+        "# `recyclarr sync --preview` before `recyclarr sync`.",
+    ]
     if not gaps:
-        return "\n".join(out + ["#", "# Nothing to suggest: every checked profile scores all its guide CFs."])
+        return "\n".join([*out, "#", "# Nothing to suggest: every checked profile scores all its guide CFs."])
     profiles = {}
     for gap in sorted(gaps, key=lambda x: (x["app"], x["instance"], x["profile"], x["cf"])):
         profiles.setdefault((gap["app"], gap["instance"], gap["profile"]), []).append(gap)
     for (app, inst, profile), items in profiles.items():
         first = items[0]
-        out += ["", f"# {app}/{inst} · {profile} (guide: {first['guide']}, score_set {first['score_set']})",
-                f"# paste under:  {app}: > {inst}: > custom_formats:"]
+        out += [
+            "",
+            f"# {app}/{inst} · {profile} (guide: {first['guide']}, score_set {first['score_set']})",
+            f"# paste under:  {app}: > {inst}: > custom_formats:",
+        ]
         by_score = {}
         for gap in items:
             by_score.setdefault(gap["score"], []).append(gap)
@@ -377,8 +430,7 @@ def run_once():
         if key in old_fp and old_fp[key] != h:
             app, kind, tid = key.split(":")
             name = guides[app][kind][tid]["name"]
-            findings.append((f"{app} · changed upstream",
-                             f"{'CF' if kind == 'cf' else 'Profile'} {name}"))
+            findings.append((f"{app} · changed upstream", f"{'CF' if kind == 'cf' else 'Profile'} {name}"))
 
     report = render(findings)
     if not findings:
@@ -388,23 +440,35 @@ def run_once():
     else:
         print(f"No new findings @ {commit} ({len(set(findings))} unchanged)", flush=True)
 
-    STATE.write_text(json.dumps({"version": STATE_VERSION, "fingerprints": fp,
-                                 "last_report": digest(report) if findings else None,
-                                 "commit": commit, "checked": time.strftime("%Y-%m-%dT%H:%M:%S")}, indent=2))
+    STATE.write_text(
+        json.dumps(
+            {
+                "version": STATE_VERSION,
+                "fingerprints": fp,
+                "last_report": digest(report) if findings else None,
+                "commit": commit,
+                "checked": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Check a Recyclarr config against the TRaSH Guides.")
-    parser.add_argument("--suggest", action="store_true",
-                        help="print Recyclarr YAML for each missing CF, grouped by profile, and exit "
-                             "(console only: no notifications, no state, never writes the config)")
+    parser.add_argument(
+        "--suggest",
+        action="store_true",
+        help="print Recyclarr YAML for each missing CF, grouped by profile, and exit "
+        "(console only: no notifications, no state, never writes the config)",
+    )
     if parser.parse_args().suggest:
         suggest()
         raise SystemExit(0)
     while True:
         try:
             run_once()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - report any failure, then try again next interval
             notify("trash-watch error", text=repr(e))
         if RUN_ONCE:
             break

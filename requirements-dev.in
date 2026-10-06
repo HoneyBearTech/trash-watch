@@ -1,0 +1,7 @@
+# Tools for the checks and tests (not needed to run trash-watch). Pinned with hashes in
+# requirements-dev.txt, regenerated with:  pip-compile --generate-hashes --strip-extras requirements-dev.in
+coverage
+pytest
+pyyaml
+ruff
+yamllint

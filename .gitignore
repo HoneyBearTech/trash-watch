@@ -4,6 +4,13 @@ data/
 # macOS
 .DS_Store
 
+# Keys and certificates never belong in the repo
+*.pem
+*.key
+
+# The old in-repo vault path; project notes live in Chronos, never here
+.obsidian-docs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

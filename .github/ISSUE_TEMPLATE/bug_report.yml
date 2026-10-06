@@ -1,0 +1,36 @@
+name: Bug report
+description: trash-watch did something wrong (a false finding, a missed one, a crash, a broken notification).
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks for reporting. **Security problems go to the private form instead** (see SECURITY.md).
+        Leave out webhook URLs, API keys, hostnames and addresses: replace them with placeholders.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release (for example 0.1.0) or commit you run, and the Recyclarr version.
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+      description: >-
+        For a wrong or missing finding, name the profile, the CF and the guide profile it was checked against.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log output
+      description: The relevant part of `docker compose logs trash-watch` (it doesn't contain secrets).
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: The relevant part of your Recyclarr config
+      description: Only the instance and profile involved. Remove `api_key` and `base_url` first.
+      render: yaml
