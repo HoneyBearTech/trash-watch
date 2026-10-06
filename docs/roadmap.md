@@ -30,8 +30,6 @@ first release: a signed multi-arch image on GHCR with an SBOM and provenance.
 
 **Checks**
 
-- Recyclarr v8 `custom_format_groups`, so instances that use them get complete "missing" findings instead
-  of a warning.
 - Template includes from Recyclarr v8's template repository.
 - An optional check of the guides' optional CF groups (opt-in, since many are deliberate choices).
 

@@ -43,6 +43,7 @@ APPS = ("radarr", "sonarr")
 TEMPLATE_REPOS = ("resources/config-templates/git/official", "repositories/config-templates")
 # Instance keys that don't affect what's checked; anything else unknown is logged as not understood
 KNOWN_KEYS = {
+    "custom_format_groups",
     "base_url",
     "api_key",
     "custom_formats",
@@ -118,7 +119,7 @@ def load_guides():
         base = CACHE / "docs/json" / app
         guides[app] = {
             kind: {d["trash_id"]: d for d in (json.loads(f.read_text()) for f in (base / folder).glob("*.json"))}
-            for kind, folder in (("cf", "cf"), ("qp", "quality-profiles"))
+            for kind, folder in (("cf", "cf"), ("qp", "quality-profiles"), ("groups", "cf-groups"))
         }
     return guides
 
@@ -153,6 +154,7 @@ def load_instances(warnings):
                 inst = settings or {}
                 tag = f"{app}/{name}"
                 cfs = list(inst.get("custom_formats") or [])
+                groups = [inst["custom_format_groups"]] if inst.get("custom_format_groups") else []
                 qps = list(inst.get("quality_profiles") or [])
                 for inc in inst.get("include") or []:
                     if "config" in inc:
@@ -170,6 +172,8 @@ def load_instances(warnings):
                         continue
                     d = load_yaml(p.read_text()) or {}
                     cfs += d.get("custom_formats") or []
+                    if d.get("custom_format_groups"):
+                        groups.append(d["custom_format_groups"])
                     qps += d.get("quality_profiles") or []
                 for key in sorted(set(inst) - KNOWN_KEYS):
                     warnings.append(
@@ -182,6 +186,8 @@ def load_instances(warnings):
                         if a.get("name") and a["name"] not in named:
                             qps.append({"name": a["name"]})
                             named.add(a["name"])
+                # Group sections ride along as marker blocks; check() resolves them against the guides
+                cfs += [{"custom_format_groups": g} for g in groups]
                 instances.append((app, name, cfs, qps))
     return instances
 
@@ -219,13 +225,70 @@ def one_line(text):
     return CONTROL_CHARS.sub(" ", str(text))
 
 
+def group_profiles(group):
+    """trash_ids of the guide quality profiles a CF group is meant for (its quality_profiles include list)."""
+    include = (group.get("quality_profiles") or {}).get("include") or {}
+    return set(include.values()) if isinstance(include, dict) else set()
+
+
+def group_cfs(group, entry):
+    """The CFs Recyclarr syncs for a group entry: the required ones, the defaults minus `exclude`, plus `select`
+    (or every optional one with `select_all`)."""
+    members = [c for c in group.get("custom_formats") or [] if isinstance(c, dict) and c.get("trash_id")]
+    required = {c["trash_id"] for c in members if c.get("required") is True}
+    default = {c["trash_id"] for c in members if c.get("default") is True}
+    optional = {c["trash_id"] for c in members} - required
+    chosen = required | (default - set(entry.get("exclude") or []))
+    return chosen | (optional if entry.get("select_all") is True else set(entry.get("select") or []) & optional)
+
+
+def resolve_groups(tag, cfs, qps, g):
+    """Turns the instance's custom_format_groups (Recyclarr v8) into ordinary CF blocks, so the per-profile
+    checks see the CFs groups add. Groups listed under `add` score the profiles in their `assign_scores_to`, or
+    else the guide-backed profiles they're meant for; default groups are synced for those profiles too unless
+    skipped. Returns the blocks without the group sections plus the resolved ones, findings for group
+    references that went stale upstream, and the groups in use."""
+    groups = g.get("groups") or {}
+    sections = [b["custom_format_groups"] for b in cfs if isinstance(b.get("custom_format_groups"), dict)]
+    plain = [b for b in cfs if "custom_format_groups" not in b]
+    entries = [e for s in sections for e in s.get("add") or [] if isinstance(e, dict)]
+    skipped = {gid for s in sections for gid in s.get("skip") or []} | {e.get("trash_id") for e in entries}
+    guide_backed = {qp["trash_id"] for qp in qps if qp.get("trash_id")}
+    for gid, group in groups.items():
+        if str(group.get("default")).lower() == "true" and gid not in skipped and guide_backed & group_profiles(group):
+            entries.append({"trash_id": gid})
+    blocks, findings, used = [], [], set()
+    for entry in entries:
+        gid = entry.get("trash_id")
+        if gid in IGNORE:
+            continue
+        group = groups.get(gid)
+        if group is None:
+            findings.append((tag, f"CF group {gid} removed or renamed upstream"))
+            continue
+        used.add(gid)
+        members = {c.get("trash_id") for c in group.get("custom_formats") or [] if isinstance(c, dict)}
+        for key in ("select", "exclude"):
+            findings += [
+                (tag, f"CF {cid} under {key} is no longer in group {group.get('name', gid)}")
+                for cid in entry.get(key) or []
+                if cid not in members and cid not in IGNORE
+            ]
+        targets = entry.get("assign_scores_to") or [
+            {"trash_id": t} for t in sorted(guide_backed & group_profiles(group))
+        ]
+        blocks.append({"trash_ids": sorted(group_cfs(group, entry)), "assign_scores_to": targets})
+    return plain + blocks, findings, used
+
+
 def check(app, inst, cfs, qps, guides, gaps=None):
     """Findings are (group, item) pairs; the group is the instance or instance · profile. Also returns the
     CFs, guide profiles and score sets in use (for fingerprints) and one coverage line per profile (log).
     With a gaps list, also appends one dict per guide CF a profile doesn't score (used by --suggest)."""
     g = guides[app]
     tag = f"{app}/{inst}"
-    findings, used_cfs, used_qps, score_sets, coverage = [], set(), set(), {"default"}, []
+    used_cfs, used_qps, score_sets, coverage = set(), set(), {"default"}, []
+    cfs, findings, used_groups = resolve_groups(tag, cfs, qps, g)
 
     for block in cfs:
         for tid in block.get("trash_ids") or []:
@@ -297,7 +360,7 @@ def check(app, inst, cfs, qps, guides, gaps=None):
             want = guide_score(g["cf"][tid], score_set)
             if want is not None and want != score:
                 findings.append((group, f"{g['cf'][tid]['name']}: {score}, guide {want}"))
-    return findings, used_cfs, used_qps, score_sets, coverage
+    return findings, used_cfs, used_qps, score_sets, coverage, used_groups
 
 
 def cf_fingerprint(cf, score_sets):
@@ -314,6 +377,7 @@ def cf_fingerprint(cf, score_sets):
 
 
 def qp_fingerprint(qp):
+    """A guide profile or CF group: everything but its description and grouping."""
     return digest({k: v for k, v in qp.items() if k not in ("trash_description", "trash_url", "group")})
 
 
@@ -441,14 +505,15 @@ def run_once():
     if state and state.get("version") != STATE_VERSION:
         print("Fingerprint format changed: re-baselining, so no upstream changes are reported this run", flush=True)
     findings, fp, warnings = [], {}, []
-    used = {app: {"cf": set(), "qp": set(), "sets": set()} for app in APPS}
+    used = {app: {"cf": set(), "qp": set(), "sets": set(), "groups": set()} for app in APPS}
 
     for app, inst, cfs, qps in load_instances(warnings):
-        f, used_cfs, used_qps, score_sets, coverage = check(app, inst, cfs, qps, guides)
+        f, used_cfs, used_qps, score_sets, coverage, used_groups = check(app, inst, cfs, qps, guides)
         findings += f
         used[app]["cf"] |= used_cfs
         used[app]["qp"] |= used_qps
         used[app]["sets"] |= score_sets
+        used[app]["groups"] |= used_groups
         print("\n".join(coverage), flush=True)
     for w in warnings:
         print(f"warning: {w}", flush=True)
@@ -458,12 +523,15 @@ def run_once():
             fp[f"{app}:cf:{tid}"] = cf_fingerprint(guides[app]["cf"][tid], u["sets"])
         for tid in u["qp"]:
             fp[f"{app}:qp:{tid}"] = qp_fingerprint(guides[app]["qp"][tid])
+        for tid in u["groups"]:
+            fp[f"{app}:groups:{tid}"] = qp_fingerprint(guides[app]["groups"][tid])
 
     for key, h in fp.items():
         if key in old_fp and old_fp[key] != h:
             app, kind, tid = key.split(":")
             name = guides[app][kind][tid]["name"]
-            findings.append((f"{app} · changed upstream", f"{'CF' if kind == 'cf' else 'Profile'} {name}"))
+            label = {"cf": "CF", "qp": "Profile", "groups": "CF group"}[kind]
+            findings.append((f"{app} · changed upstream", f"{label} {name}"))
 
     report = render(findings)
     if not findings:

@@ -40,7 +40,8 @@ For every Radarr and Sonarr instance in your config:
 | `<CF>: synced, but not scored in this profile` | The CF exists in the instance, but none of this profile's `assign_scores_to` blocks lists it |
 | `score_set X, guide uses Y` | Your profile takes its scores from a different score set than the guide's profile |
 | `<CF>: N, guide M` | A score you set differs from the guide's score in your profile's score set |
-| `changed upstream: CF/Profile <name>` | A CF or profile you use changed in a way that affects you (its conditions, or its scores in your score sets) since the last check |
+| `changed upstream: CF/Profile/CF group <name>` | A CF, profile or CF group you use changed in a way that affects you (its conditions, its scores in your score sets, or a group's members) since the last check |
+| `CF group <trash_id> removed or renamed upstream` / `CF <trash_id> under select is no longer in group <name>` | A Recyclarr v8 `custom_format_groups` entry points at a group, or a CF in a group, that the guides no longer have |
 
 Each profile in your config is matched to a guide profile by:
 1. its `trash_id`;
@@ -163,8 +164,6 @@ are left out. Each snippet is indented to paste directly under that instance's `
   aren't checked.
 - **Guide-backed profiles (with a `trash_id`) are only checked to exist.** Recyclarr syncs their CFs and
   scores from the guide itself.
-- **v8 `custom_format_groups` aren't understood yet.** trash-watch logs a warning when an instance uses
-  them, because "missing" findings for that instance may then be wrong.
 - **Template includes are resolved through `includes.json` in Recyclarr's config-templates checkout.**
   Current v8 template repos don't have one, so such includes are logged as not found.
 - **Renamed profiles need a hint.** A profile whose name and `score_set` don't identify a guide profile

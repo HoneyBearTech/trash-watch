@@ -1,0 +1,12 @@
+{
+  "name": "[Optional] Fixture x265",
+  "trash_id": "c0000000000000000000000000000001",
+  "trash_description": "Fixture group: one optional CF, one required.",
+  "custom_formats": [
+    { "name": "x265 (HD)", "trash_id": "a0000000000000000000000000000001", "required": false },
+    { "name": "BR-DISK", "trash_id": "a0000000000000000000000000000003", "required": true }
+  ],
+  "quality_profiles": {
+    "include": { "[SQP] SQP-1 (1080p)": "b0000000000000000000000000000001" }
+  }
+}

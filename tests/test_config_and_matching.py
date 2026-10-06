@@ -58,13 +58,13 @@ def test_missing_include_and_unknown_key_are_warned(workspace):
         workspace,
         text.replace(
             "    quality_profiles:",
-            "    include:\n      - template: no-such-template\n    custom_format_groups: {}\n    quality_profiles:",
+            "    include:\n      - template: no-such-template\n    some_future_setting: {}\n    quality_profiles:",
         ),
     )
     warnings = []
     tw.load_instances(warnings)
     assert any("include {'template': 'no-such-template'} not found" in w for w in warnings)
-    assert any("'custom_format_groups' isn't understood" in w for w in warnings)
+    assert any("'some_future_setting' isn't understood" in w for w in warnings)
 
 
 def test_configs_dir_and_scored_only_profiles_are_read(workspace):

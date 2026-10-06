@@ -8,6 +8,11 @@ All notable changes to trash-watch are documented here. The format follows
 
 ### Added
 
+- Recyclarr v8 `custom_format_groups` are understood instead of warned about: the CFs a group adds count as
+  scored in the profiles it's assigned to (Recyclarr's rules: required, defaults minus `exclude`, `select` or
+  `select_all`; `assign_scores_to`, or the guide-backed profiles it's meant for; default groups unless
+  skipped). New findings: a group removed upstream, a `select`/`exclude` entry no longer in its group, and a
+  group that changed upstream.
 - A health check: `trash_watch.py --health` (the image's `HEALTHCHECK`, every 5 minutes) reports the container
   unhealthy when no check has completed for two intervals, so monitoring notices a watcher that crashed, hangs
   or keeps failing.
