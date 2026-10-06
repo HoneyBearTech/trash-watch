@@ -10,7 +10,8 @@ workflow when a version tag is pushed. You can check that what you run came from
   commit it was built) as attestations;
 - each GitHub Release has a source archive (with the license), `image.txt` (the image digest) and
   `SHA256SUMS`, which is signed the same way (`SHA256SUMS.sigstore.json`), plus **SLSA build provenance**
-  for those files (`trash-watch-<version>.provenance.sigstore.json`, also stored by GitHub);
+  for those files (`trash-watch-<version>.provenance.sigstore.json`, also stored by GitHub, and the same
+  provenance as in-toto JSON Lines in `trash-watch-<version>.intoto.jsonl`, for releases after 0.1.1);
 - the **version tag** in git is signed with the maintainer's SSH key.
 
 This applies to every release, starting with 0.1.0. You need
