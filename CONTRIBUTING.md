@@ -44,6 +44,10 @@ the linters below, a gitleaks scan of the whole history, the unit tests with a c
 image and starts it, and validates the compose file. CodeQL, dependency review, a DCO check and OpenSSF
 Scorecard also run on the repository, and Trivy scans the image weekly for known vulnerabilities.
 
+The maintainer also keeps a copy on a self-hosted GitLab, mirrored from GitHub by a scheduled job in
+[`.gitlab-ci.yml`](.gitlab-ci.yml), which re-runs the "Checks + tests" steps that need no Docker daemon on
+every commit it receives. Changes go to GitHub only; a commit made on the GitLab copy stops the mirror.
+
 The tests are offline: they run against small fixtures in [`tests/fixtures/`](tests/fixtures/) (a fake
 guides tree and a fake Recyclarr config), a local git repository stands in for GitHub, and any attempt to
 reach the network fails the test.

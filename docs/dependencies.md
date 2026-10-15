@@ -30,6 +30,7 @@ always gets the same bytes:
 | Atheris (coverage-guided fuzzing, Linux x86_64 only) | [`requirements-fuzz.in`](../requirements-fuzz.in) → [`requirements-fuzz.txt`](../requirements-fuzz.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` in [`fuzz.yml`](../.github/workflows/fuzz.yml) |
 | Linters and scanners used only by CI (actionlint, hadolint, gitleaks, Trivy) | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | version tag and digest | Docker |
 | GitHub Actions | [`.github/workflows/`](../.github/workflows/) | full commit SHA (version in a comment) | GitHub Actions |
+| Images of the GitLab copy's pipeline (Python, Docker CLI, git, gitleaks, actionlint, hadolint) | [`.gitlab-ci.yml`](../.gitlab-ci.yml) | version tag and digest | GitLab Runner (Docker executor) |
 
 Released images carry an SBOM listing every package in them ([verifying-releases.md](verifying-releases.md)).
 To update a pinned Python dependency, edit the `.in` file if needed and run
@@ -53,8 +54,8 @@ To update a pinned Python dependency, edit the `.in` file if needed and run
   (3.14 to 3.15), get a one-time check against a real config first.
 - A merged update reaches users only in the next release; the maintainer's own deployment runs a released
   image pinned by digest.
-- The CI-only images in `run:` steps aren't seen by Dependabot; they're bumped by hand at least every
-  quarter.
+- The CI-only images in `run:` steps and the images in `.gitlab-ci.yml` aren't seen by Dependabot; they're
+  bumped by hand at least every quarter.
 
 ## Policy for vulnerabilities in dependencies
 

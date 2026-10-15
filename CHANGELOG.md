@@ -6,6 +6,14 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `.gitlab-ci.yml` for the copy of the repository on the maintainer's self-hosted GitLab. GitHub stays the
+  project's home and its Actions the required checks; on GitLab a scheduled job mirrors `main` and the tags from
+  GitHub (fast-forward only, with a project access token in a masked, protected CI/CD variable), and every
+  commit that arrives gets the checks that need no Docker daemon: ruff, yamllint, the unit and property tests
+  with the coverage floor, gitleaks over the whole history, actionlint, hadolint and the compose-file check.
+
 ## [0.2.0] - 2026-10-06
 
 Health monitoring, Recyclarr v8 CF groups, and in-toto provenance for releases.

@@ -45,6 +45,10 @@ Recyclarr config against the TRaSH Guides JSON (`TRaSH-Guides/Guides`, `docs/jso
   with a reason) and `ruff format`; everything type-annotated (aliases `Block`, `Finding`, `Guides`, `Instance`
   in `trash_watch.py`; `RunChecks`, `EditGuideCf` in `tests/conftest.py`), yamllint, pytest + coverage (90 % branch floor), Hypothesis (property tests),
   Atheris (coverage-guided fuzzing, Linux x86_64 only), pip-tools for the hash-pinned requirements. CI-only: actionlint, hadolint, gitleaks, CodeQL, Scorecard, dependency review.
+- GitLab copy: the owner's self-hosted GitLab (CE, LAN only; details in Chronos) holds a mirror. GitHub stays
+  the home (OpenSSF badges, Scorecard, Dependabot, releases); every change goes to GitHub as a PR, never to
+  GitLab. `.gitlab-ci.yml` mirrors GitHub on a schedule (fast-forward only, `MIRROR_TOKEN` CI/CD variable) and
+  re-runs the daemon-free checks; the image build/start and the Atheris fuzzing stay GitHub-only.
 - Releases: signed multi-arch images on GHCR (cosign keyless), SBOM, SLSA provenance, signed checksums.
 
 ## Before making structural changes
@@ -83,6 +87,9 @@ only commit or push it when the owner asks.
   `SHA256SUMS`), `dependabot-auto-merge.yml` (auto-merge for Dependabot's patch/minor updates; base image
   patch only); `dependabot.yml`; issue/PR templates; `CODEOWNERS`; `allowed_signers` (tag-signing key).
   Actions pinned by full SHA; every workflow has top-level `permissions:`; untrusted input only via `env:`.
+- `.gitlab-ci.yml`: the pipeline of the copy on the owner's GitLab: a scheduled `mirror` job (GitHub → GitLab,
+  fast-forward only) and, on every push, the daemon-free part of "Checks + tests" (`checks`, `compose-config`,
+  `gitleaks`, `actionlint`, `hadolint`). Images pinned by tag and digest, bumped by hand.
 - Root policies: `SECURITY.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`.
 - `tests/`: pytest, no network. `tests/fixtures/guides/docs/json/radarr/` is a tiny fake guides tree (three
   CFs, one SQP profile) and `tests/fixtures/config/recyclarr.yml` a fake config built so that each check
