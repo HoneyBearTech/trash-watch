@@ -8,7 +8,7 @@ fuzzer (Atheris) through `.hypothesis.fuzz_one_input`.
 """
 
 import collections
-import datetime
+import datetime as dt
 import json
 import re
 from typing import Any
@@ -107,7 +107,7 @@ def test_suggestions_parse_back_to_exactly_the_blocks_for_the_gaps(gap_list: lis
     assert got == collections.Counter((g["trash_id"], g["profile"], g["score"]) for g in gap_list)
 
 
-PLAIN_TYPES = (dict, list, str, int, float, bool, type(None), datetime.date, bytes, set)
+PLAIN_TYPES = (dict, list, str, int, float, bool, type(None), dt.date, bytes, set)
 
 
 def plain(value: object) -> bool:
