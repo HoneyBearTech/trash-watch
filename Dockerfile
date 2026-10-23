@@ -1,5 +1,5 @@
 # Base image pinned by version and multi-arch digest; Dependabot proposes updates to both.
-FROM python:3.14.8-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+FROM python:3.15.0-slim@sha256:2da676046630d7bf14c6764ae1143dc7fa0377a53f94bf5a642f0b214aca5bce
 
 # Debian's security updates for the base image's packages (the Python image can lag behind them, as it did
 # for OpenSSL at 0.1.0), then git, which fetches the TRaSH Guides. Package versions come from the base image's
