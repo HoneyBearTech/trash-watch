@@ -26,8 +26,8 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      # Python packages and GitHub Actions: patch and minor updates. The base image: patch only (3.14.7 ->
-      # 3.14.8); a new Python minor (3.14 -> 3.15) and every major update wait for a human, and a run-once
+      # Python packages and GitHub Actions: patch and minor updates. The base image: patch only (3.15.0 ->
+      # 3.15.1); a new Python minor (3.15 -> 3.16) and every major update wait for a human, and a run-once
       # against a real Recyclarr config.
       - name: Enable auto-merge for patch and minor updates
         if: >-

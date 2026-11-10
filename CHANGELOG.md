@@ -6,6 +6,12 @@ All notable changes to trash-watch are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The image is built on `python:3.15-slim`. PyYAML has no Python 3.15 wheel yet, so pip builds it from its
+  hash-checked sdist; the build tools it uses aren't hash-pinned (see docs/dependencies.md). CI and the GitLab
+  pipeline still test on 3.14 until PyYAML ships 3.15 wheels.
+
 ### Added
 
 - `.gitlab-ci.yml` for the copy of the repository on the maintainer's self-hosted GitLab. GitHub stays the
