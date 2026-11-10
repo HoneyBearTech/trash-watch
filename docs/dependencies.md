@@ -23,7 +23,7 @@ always gets the same bytes:
 
 | Dependency | Declared in | Pinned by | Fetched by |
 | --- | --- | --- | --- |
-| Base image (`python:3.14-slim`, which brings Python and Debian) | [`Dockerfile`](../Dockerfile) | version tag and multi-arch digest | Docker / BuildKit |
+| Base image (`python:3.15-slim`, which brings Python and Debian) | [`Dockerfile`](../Dockerfile) | version tag and multi-arch digest | Docker / BuildKit |
 | git, ca-certificates | [`Dockerfile`](../Dockerfile) | the base image's Debian release | apt |
 | PyYAML (runtime) | [`requirements.in`](../requirements.in) → [`requirements.txt`](../requirements.txt) | exact version and SHA-256 hashes (`pip-compile --generate-hashes`) | `pip install --require-hashes --no-deps` |
 | Check and test tools (pytest, coverage, Hypothesis, ruff, yamllint, PyYAML) | [`requirements-dev.in`](../requirements-dev.in) → [`requirements-dev.txt`](../requirements-dev.txt) | exact version and SHA-256 hashes | `pip install --require-hashes --no-deps` |
@@ -32,7 +32,12 @@ always gets the same bytes:
 | GitHub Actions | [`.github/workflows/`](../.github/workflows/) | full commit SHA (version in a comment) | GitHub Actions |
 | Images of the GitLab copy's pipeline (Python, Docker CLI, git, gitleaks, actionlint, hadolint) | [`.gitlab-ci.yml`](../.gitlab-ci.yml) | version tag and digest | GitLab Runner (Docker executor) |
 
-Released images carry an SBOM listing every package in them ([verifying-releases.md](verifying-releases.md)).
+**Known exception: PyYAML on Python 3.15.** PyYAML 6.0.3 publishes wheels only up to cp314, so on the 3.15
+base image pip builds it from the sdist. The sdist and PyYAML itself are still checked against the hashes in
+`requirements.txt`, but pip installs the build dependencies (setuptools, Cython) in an isolated environment
+without pins or hashes, so those two aren't "the same bytes" on every build. The maintainer accepted this
+rather than stay on 3.14. It ends when PyYAML publishes cp315 wheels: regenerate `requirements.txt` then, and
+the image installs from a wheel again. Released images carry an SBOM listing every package in them ([verifying-releases.md](verifying-releases.md)).
 To update a pinned Python dependency, edit the `.in` file if needed and run
 `pip-compile --generate-hashes --strip-extras <file>.in` (pip-tools).
 
@@ -47,11 +52,11 @@ To update a pinned Python dependency, edit the `.in` file if needed and run
 - **Low-risk updates merge automatically**
   ([`.github/workflows/dependabot-auto-merge.yml`](../.github/workflows/dependabot-auto-merge.yml)): patch
   and minor updates to the Python packages and GitHub Actions, and patch updates to the base image
-  (3.14.7 to 3.14.8), are squash-merged once every required check has passed (CI with the image build and
+  (3.15.0 to 3.15.1), are squash-merged once every required check has passed (CI with the image build and
   start, CodeQL, dependency review). Nothing skips a check, and a failing update stays open for the
   maintainer.
 - **Everything else is merged by hand**: major updates, and a base image moving to a new Python minor
-  (3.14 to 3.15), get a one-time check against a real config first.
+  (3.15 to 3.16), get a one-time check against a real config first.
 - A merged update reaches users only in the next release; the maintainer's own deployment runs a released
   image pinned by digest.
 - The CI-only images in `run:` steps and the images in `.gitlab-ci.yml` aren't seen by Dependabot; they're

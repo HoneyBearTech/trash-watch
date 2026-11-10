@@ -63,7 +63,7 @@ Everything is also printed to stdout (`docker compose logs trash-watch`): `OK â€
 
 ## Image
 
-Built from the [`Dockerfile`](../Dockerfile): `python:3.14-slim` (pinned by version and digest) with `git`
+Built from the [`Dockerfile`](../Dockerfile): `python:3.15-slim` (pinned by version and digest) with `git`
 and `ca-certificates` (with Debian's security updates applied at build time), PyYAML installed from the
 hash-pinned [`requirements.txt`](../requirements.txt) (pip is removed afterwards), and
 `trash_watch.py` and `LICENSE` in `/app`; it runs `python -u trash_watch.py` as the unprivileged user `trash-watch`

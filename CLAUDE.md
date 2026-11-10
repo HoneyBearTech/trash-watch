@@ -40,7 +40,7 @@ Recyclarr config against the TRaSH Guides JSON (`TRaSH-Guides/Guides`, `docs/jso
   without `permissions:`, or dropping the coverage floor), say so before making it.
 
 ## Stack
-- Python 3.14 (one script, standard library plus PyYAML), git, Docker Compose. No web UI, no HTTP API.
+- Python 3.15 in the image, tested on 3.14 in CI (one script, standard library plus PyYAML), git, Docker Compose. No web UI, no HTTP API.
 - Tooling: ruff with every rule family (`select = ["ALL"]`, exceptions in `pyproject.toml`; per-line `noqa`
   with a reason) and `ruff format`; everything type-annotated (aliases `Block`, `Finding`, `Guides`, `Instance`
   in `trash_watch.py`; `RunChecks`, `EditGuideCf` in `tests/conftest.py`), yamllint, pytest + coverage (90 % branch floor), Hypothesis (property tests),
@@ -69,7 +69,7 @@ only commit or push it when the owner asks.
 - `trash_watch.py`: the whole watcher. Each run it syncs a sparse, shallow clone of the guides
   (`docs/json` only), loads the Recyclarr config, checks each Radarr/Sonarr instance, compares against
   the last state and notifies on change. Then it sleeps `INTERVAL_HOURS`, or exits when `RUN_ONCE=1`.
-- `Dockerfile`: `python:3.14-slim` pinned by version and digest, + `git`, PyYAML from the hash-pinned
+- `Dockerfile`: `python:3.15-slim` pinned by version and digest, + `git`, PyYAML from the hash-pinned
   `requirements.txt` (`--require-hashes`), `trash_watch.py` and `LICENSE`; runs `trash_watch.py` unbuffered.
   `requirements.in` / `requirements-dev.in` are the sources; regenerate the `.txt` files with
   `pip-compile --generate-hashes --strip-extras <file>.in`.

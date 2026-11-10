@@ -17,7 +17,7 @@ Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Development setup
 
-You need git, Python 3.14 (the image's version), and Docker with Compose v2 for the image and the end-to-end check.
+You need git, Python 3.14 or newer (the image runs 3.15; CI tests on 3.14 until PyYAML ships 3.15 wheels), and Docker with Compose v2 for the image and the end-to-end check.
 
 ```sh
 git clone https://github.com/HoneyBearTech/trash-watch.git && cd trash-watch
