@@ -6,12 +6,25 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15256/badge)](https://www.bestpractices.dev/projects/15256)
 [![OpenSSF Baseline](https://www.bestpractices.dev/projects/15256/baseline)](https://www.bestpractices.dev/projects/15256)
 
-A small Docker sidecar for [Recyclarr](https://recyclarr.dev). Once a day it compares your Recyclarr
-config with the current [TRaSH Guides](https://github.com/TRaSH-Guides/Guides) JSON for Radarr and Sonarr.
-When your config has drifted from the guides, it sends a notification to Discord and/or ntfy.
+A small Docker Compose service for [Recyclarr](https://recyclarr.dev). It compares your Recyclarr
+config with the current [TRaSH Guides](https://github.com/TRaSH-Guides/Guides) JSON for Radarr and Sonarr,
+then reports changes to Discord and/or ntfy when configured.
 
 It only reads. Your Recyclarr config is mounted read-only, and trash-watch never talks to Radarr, Sonarr
 or Recyclarr.
+
+trash-watch is one container that runs beside Recyclarr on the Docker host holding Recyclarr's config.
+It makes outbound HTTPS requests to GitHub and optional notification or heartbeat destinations. It
+listens on no ports.
+
+## Repository layout
+
+- `trash_watch.py`: checker and command-line entry point
+- `Dockerfile`, `docker-compose.yml`: container image and the single Compose service
+- `docs/`: [quick start](docs/quick-start.md), [installation](docs/installing.md), user guide, interfaces,
+  architecture, security, and other focused documentation
+- `tests/` and `tests/fixtures/`: unit tests and small sample Recyclarr/guide data
+- `data/`: runtime guide cache and state; created locally and gitignored
 
 ## Why
 
@@ -54,7 +67,9 @@ unnoticed.
 
 ## Setup
 
-You need a Docker host with Compose v2, running Recyclarr (v7 or v8) or with its config directory on disk.
+You need Docker with Compose v2 and the host path of Recyclarr's config directory. Recyclarr can run on
+the same host, or its config can otherwise be present there. trash-watch mounts that path at `/config`
+read-only; it does not connect to Recyclarr, Radarr, or Sonarr.
 
 **1. Find Recyclarr's config directory.** This is the host path your Recyclarr container mounts at
 `/config`:
@@ -71,8 +86,9 @@ cp .env.example .env && chmod 600 .env
 mkdir -p data      # created by you, so it belongs to your user (uid 1000 by default)
 ```
 
-In `.env`, set `RECYCLARR_CONFIG_PATH` to the path from step 1 and add a Discord webhook or ntfy URL.
-`.env` holds secrets and is gitignored; never commit it.
+In `.env`, set `RECYCLARR_CONFIG_PATH` to the path from step 1 and optionally configure notifications.
+`.env` holds secrets and is gitignored; never commit it. See [Interfaces](docs/interfaces.md#settings) for
+all supported settings and defaults.
 
 **3. Run one check.** It prints the result and exits:
 
@@ -84,15 +100,18 @@ Read the per-profile lines at the top of the output. Add any profile marked `NOT
 `PROFILE_MAP`, or to `IGNORE` if it's your own, then run again. Put any finding you're keeping on purpose
 in `IGNORE`.
 
-**4. Leave it running.**
+## Operations
+
+Start the service and follow its logs:
 
 ```sh
 docker compose up -d --build
 docker compose logs -f trash-watch
 ```
 
-It checks at start-up and then every `INTERVAL_HOURS`; `docker compose ps` shows it `(healthy)` while checks keep
-completing. To update it: `git pull && docker compose up -d --build`.
+It checks at start-up and then every `INTERVAL_HOURS` (24 hours by default). `docker compose ps` shows it
+healthy while checks keep completing. To update a checkout-based install, run `git pull && docker compose
+up -d --build`. For settings, mounts, commands, and connections, see [Interfaces](docs/interfaces.md).
 
 ## Settings (`.env`)
 
@@ -109,8 +128,9 @@ completing. To update it: `git pull && docker compose up -d --build`.
 | `TRASH_WATCH_UID` / `TRASH_WATCH_GID` | `1000` | The unprivileged user and group the container runs as. They must own `data/` on the host; change them if your host user isn't 1000 (`id -u`, `id -g`). |
 | `TRASH_WATCH_PULL_POLICY` | `build` | `build` builds from the checkout on every start; set `always` together with a release `TRASH_WATCH_IMAGE`. |
 
-`RUN_ONCE=1` (one check, then exit) is for `docker compose run -e RUN_ONCE=1` only. Don't put it in `.env`:
-with `restart: unless-stopped`, the container would start again straight after every exit.
+`RUN_ONCE=1` (one check, then exit) is a command-line override only, for example `make run-once` or
+`docker compose run --rm -e RUN_ONCE=1 trash-watch`. Don't put it in `.env`: with `restart: unless-stopped`,
+the container would start again straight after every exit.
 
 ## Example output
 
