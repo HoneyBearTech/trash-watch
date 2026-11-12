@@ -2,6 +2,10 @@
 
 <!-- What does this change, and why? Link the issue it closes, if any. -->
 
+Migrated from Dependabot
+
+After this PR merges, disable Dependabot security updates while keeping security alerts enabled.
+
 ## Checklist
 
 - [ ] Every commit is signed off (`git commit -s`), certifying the [DCO](https://developercertificate.org/); see [CONTRIBUTING.md](../CONTRIBUTING.md#developer-certificate-of-origin).
