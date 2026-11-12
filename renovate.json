@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["dockerfile", "pip_requirements", "github-actions"],
+  "dependencyDashboard": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "schedule": ["before 6am on monday"],
+  "timezone": "America/Chicago",
+  "labels": ["dependencies"],
+  "automerge": false,
+  "packageRules": [
+    {
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": ["Dockerfile"]
+    },
+    {
+      "matchManagers": ["pip_requirements"],
+      "matchFileNames": ["requirements*.txt"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "CodeQL",
+      "matchPackageNames": ["github/codeql-action"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions minor and patch updates",
+      "matchUpdateTypes": ["minor", "patch"]
+    }
+  ]
+}
