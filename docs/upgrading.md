@@ -21,7 +21,12 @@ run.
 
 ## Back up first
 
+Stop the service before snapshotting state so no check writes during the copy. Skip the state-copy
+command if no check has completed successfully yet and `data/state.json` does not exist. Keep `.env`
+backups confidential, with the same restricted permissions as `.env`.
+
 ```sh
+docker compose stop trash-watch
 cp .env .env.backup
 cp data/state.json data/state.json.backup
 ```
@@ -40,24 +45,29 @@ Use your `TRASH_WATCH_UID:TRASH_WATCH_GID` instead of `1000:1000` if you set the
 
 ## From a checkout (building the image)
 
+The tag below is the existing `0.2.0` example, not a claim about the newest release.
+
 ```sh
-git fetch --tags && git checkout v0.1.0   # or: git pull, to follow main
+git fetch --tags && git checkout v0.2.0   # or: git pull, to follow main
 docker compose up -d                      # rebuilds the image and restarts the container
 docker compose logs -f trash-watch        # the per-profile lines, then OK / findings
 ```
 
 ## From a release image
 
-Set the new version in `.env` (`TRASH_WATCH_IMAGE=ghcr.io/honeybeartech/trash-watch:0.1.1`),
-optionally [verify it](verifying-releases.md), then `git pull` (the compose file and `.env.example` can
+Set `TRASH_WATCH_IMAGE` in `.env` to the chosen release image, for example
+`ghcr.io/honeybeartech/trash-watch:0.2.0` (an example, not a claim about the newest release),
+[verify it](verifying-releases.md), then `git pull` (the compose file and `.env.example` can
 change between releases) and `docker compose up -d`.
 
 ## Rolling back
 
-Check out the previous tag (or set the previous `TRASH_WATCH_IMAGE`), restore the backups, and run
+Stop the service before restoring state. Check out the previous tag (or set the previous
+`TRASH_WATCH_IMAGE`), restore the backups, and run
 `docker compose up -d`:
 
 ```sh
+docker compose stop trash-watch
 cp .env.backup .env
 sudo cp data/state.json.backup data/state.json
 ```

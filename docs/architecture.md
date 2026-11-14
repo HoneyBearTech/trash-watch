@@ -5,7 +5,7 @@ or Recyclarr. It reads Recyclarr's config files and the TRaSH Guides JSON, and c
 
 ```
 TRaSH-Guides/Guides (GitHub) ──git fetch──▶ data/guides/docs/json ─┐
-                                                                   ├─▶ check ─▶ data/state.json
+                                                                   ├─▶ check ─▶ data/state.json ─▶ heartbeat
 Recyclarr app-data dir ──read-only mount──▶ /config ───────────────┘      │
                                                                           └─▶ ntfy / Discord (on change)
 ```
@@ -17,7 +17,8 @@ Recyclarr app-data dir ──read-only mount──▶ /config ──────
    only thing trash-watch writes besides `state.json`.
 2. **Load the guides.** For `radarr` and `sonarr`: every custom format (`cf/*.json`), quality profile
    (`quality-profiles/*.json`) and CF group (`cf-groups/*.json`), keyed by `trash_id`.
-3. **Load the config.** It reads `recyclarr.yml` or `recyclarr.yaml` and `configs/*.yml` under `/config`.
+3. **Load the config.** It reads `recyclarr.yml` or `recyclarr.yaml` and `configs/*.yml` / `configs/*.yaml`
+   under `/config` (the `*.y*ml` pattern).
    For each Radarr and Sonarr instance it collects `custom_formats` and `quality_profiles`, including those
    from includes: local `include: - config:` files (relative paths resolve under `includes/`) and
    `include: - template:` ones, looked up in the `includes.json` of Recyclarr's copy of the
@@ -31,6 +32,7 @@ Recyclarr app-data dir ──read-only mount──▶ /config ──────
    that it was ignored, or that it matched nothing and was **not checked**, plus a `warning:` for an
    include it couldn't find or an instance key it doesn't understand.
 5. **Compare with the last run** and notify if the findings changed. Then it saves `data/state.json`.
+6. **Send the heartbeat**, if configured, only after state is saved. A failed heartbeat is logged.
 
 Then it sleeps for `INTERVAL_HOURS`, or exits if `RUN_ONCE=1`. If a run fails, it sends a
 `trash-watch error` notification and tries again at the next interval.
@@ -109,17 +111,18 @@ report that loses only those lines counts as changed and is sent again.
 block per guide score: `assign_scores_to` names the profile and sets the guide's score for the profile's
 `score_set` (falling back to `default`, and left out when the guide has no score). Profile names are quoted
 only when YAML needs it. The output parses as YAML, and it's indented to paste under an instance's
-`custom_formats:` list. Nothing else happens: no notification, no `state.json`, and no write to the
-config.
+`custom_formats:` list. Suggestion mode still synchronizes the guides cache, but sends no notification
+or heartbeat, writes no `state.json`, and never writes the config.
 
 ## State
 
-`data/state.json` holds a 16-character SHA-256 fingerprint of each guide CF and profile your config uses,
-a hash of the last report, the guides commit, the time of the last completed check (UTC; `--health` reads it)
+`data/state.json` holds a 16-character SHA-256 fingerprint of each guide CF, profile and CF group your
+config uses, a hash of the last report, the guides commit, the time of the last completed check
+(UTC; `--health` reads it)
 and a format version. A CF's
 fingerprint covers only what affects you: its conditions, its rename flag, and its scores in the score
 sets your profiles use. So a new language's score set or a reworded description isn't a "change". A
-profile's covers everything but its description and group.
+profile or CF group fingerprint covers everything but its description and group.
 
 Deleting `state.json` is safe: the next run notifies the current findings again and starts fingerprinting
 from scratch. It can't report upstream changes on that first run. The same happens once, on purpose, when

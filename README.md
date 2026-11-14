@@ -52,6 +52,23 @@ Each profile in your config is matched to a guide profile by:
 Every run logs what each profile was checked against, so a profile that matched nothing doesn't go
 unnoticed.
 
+## Layout and connections
+
+| Path | Purpose |
+| --- | --- |
+| `trash_watch.py` | Watcher, suggestion output and health command |
+| `docker-compose.yml` / `Dockerfile` | One local `trash-watch` service and its container image |
+| `.env.example` / `.env` | Settings template / ignored local settings and secrets |
+| `requirements*.in` / `requirements*.txt` | Dependency declarations / hash-pinned installation files |
+| `Makefile` / `pyproject.toml` | Development commands and test/lint settings |
+| `tests/fixtures` / `fuzz/` | Offline test data and fuzz targets |
+| `docs/` | Setup, operation and design documentation |
+| `data/guides` / `data/state.json` | Ignored runtime guides cache / findings, fingerprints and last-check state |
+
+Compose publishes no ports. Recyclarr's config files must be on the same Docker host. The container
+needs outbound HTTPS to GitHub and access to the configured notification and heartbeat destinations.
+It needs no Radarr, Sonarr or Recyclarr API access or keys.
+
 ## Setup
 
 You need a Docker host with Compose v2, running Recyclarr (v7 or v8) or with its config directory on disk.
@@ -74,7 +91,8 @@ mkdir -p data      # created by you, so it belongs to your user (uid 1000 by def
 In `.env`, set `RECYCLARR_CONFIG_PATH` to the path from step 1 and add a Discord webhook or ntfy URL.
 `.env` holds secrets and is gitignored; never commit it.
 
-**3. Run one check.** It prints the result and exits:
+**3. Run one check.** It logs the result, can send notifications and a configured heartbeat, saves state,
+and exits. For a terminal-only preview, use the [quick start](docs/quick-start.md#2-run-a-one-time-check):
 
 ```sh
 make run-once        # or: docker compose run --rm --build -e RUN_ONCE=1 trash-watch
@@ -92,7 +110,9 @@ docker compose logs -f trash-watch
 ```
 
 It checks at start-up and then every `INTERVAL_HOURS`; `docker compose ps` shows it `(healthy)` while checks keep
-completing. To update it: `git pull && docker compose up -d --build`.
+completing within two intervals plus ten minutes. Use `docker compose stop trash-watch` to stop it and
+`docker compose up -d` to start it again. See [upgrading](docs/upgrading.md) for updates and state backups,
+and the [user guide](docs/user-guide/README.md#hearing-about-it-again) for a state reset.
 
 ## Settings (`.env`)
 
@@ -153,16 +173,16 @@ make suggest     # or: docker compose run --rm --build trash-watch python -u tra
             score: -10000
 ```
 
-It only prints to the console. It never writes to your config (which is mounted read-only anyway), sends no
-notifications, and doesn't touch `data/state.json`, so the daily report isn't affected. CFs in `IGNORE`
-are left out. Each snippet is indented to paste directly under that instance's `custom_formats:` list. Run
+It prints suggestions to the console and synchronizes `data/guides/`. It never writes to your config
+(which is mounted read-only anyway), sends no notifications or heartbeat, and doesn't touch
+`data/state.json`, so the daily report isn't affected. CFs in `IGNORE` are left out. Each snippet is indented to paste directly under that instance's `custom_formats:` list. Run
 `recyclarr sync --preview` before you sync.
 
 ## Limitations
 
-- **It checks the guide's core list for each profile, not every optional CF.** A guide profile's JSON
-  lists the CFs that profile needs. The optional extras in the guide's pages and in Recyclarr's templates
-  aren't checked.
+- **It checks core profile CFs and configured v8 groups.** Explicit `custom_format_groups`, including
+  selected optional members, are resolved. There is no blanket audit of unselected optional extras in
+  the guide's pages or Recyclarr's templates.
 - **Guide-backed profiles (with a `trash_id`) are only checked to exist.** Recyclarr syncs their CFs and
   scores from the guide itself.
 - **Template includes are resolved through `includes.json` in Recyclarr's config-templates checkout.**
@@ -213,8 +233,9 @@ make run-once   # build, then one check against the config in .env
 make suggest    # build, then print paste-ready YAML for missing CFs (console only)
 ```
 
-`make` isn't installed on every Docker host. Each target is a single `docker compose` command, so you can
-copy it from the [Makefile](Makefile). How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md).
+`make test` and `make lint` create a local `.venv` with hash-pinned dependencies. The container targets
+use Compose; `run-once` and `suggest` build first. If `make` isn't installed, copy the relevant commands
+from the [Makefile](Makefile). How to contribute is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
