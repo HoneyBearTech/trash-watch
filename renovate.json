@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "labels": ["dependencies"],
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"]
+  },
+  "automerge": false,
+  "schedule": ["before 6am on monday"],
+  "timezone": "America/Chicago",
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "minor and patch dependencies"
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"]
+    }
+  ],
+  "enabledManagers": [
+    "dockerfile",
+    "docker-compose",
+    "github-actions",
+    "gitlabci",
+    "pip_requirements",
+    "custom.regex"
+  ],
+  "pip_requirements": {
+    "managerFilePatterns": ["/^requirements(?:-[^/]+)?\\.(?:in|txt)$/"]
+  },
+  "gitlabci": {
+    "managerFilePatterns": ["/^\\.gitlab-ci\\.yml$/"]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github\\/workflows\\/scan\\.yml$/"],
+      "matchStrings": ["image: \\\"(?<depName>ghcr\\.io/honeybeartech/trash-watch):(?<currentValue>[^\\\"]+)\\\""],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.env\\.example$/"],
+      "matchStrings": ["# TRASH_WATCH_IMAGE=ghcr\\.io/honeybeartech/trash-watch:(?<currentValue>[^\\s]+)"],
+      "depNameTemplate": "ghcr.io/honeybeartech/trash-watch",
+      "datasourceTemplate": "docker"
+    }
+  ]
+}
