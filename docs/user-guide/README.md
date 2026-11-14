@@ -62,7 +62,9 @@ trash-watch never changes your config. To fix a missing CF, have it print the YA
 docker compose run --rm trash-watch python -u trash_watch.py --suggest
 ```
 
-Paste each block under that instance's `custom_formats:` in your Recyclarr config, then:
+This command synchronizes the guides cache, but sends no notifications or heartbeat, saves no state,
+and never writes your config. Paste each block under that instance's `custom_formats:` in your Recyclarr
+config, then:
 
 ```sh
 recyclarr sync --preview    # see exactly what Recyclarr will change
@@ -76,8 +78,8 @@ your setup.
 ## Knowing it's still checking
 
 The container reports its own health: `docker compose ps` shows `(healthy)` while checks keep completing,
-and `(unhealthy)` when none has completed for two intervals, whether it crashed, hangs or every check
-fails. Run the check yourself with `docker exec trash-watch python -u trash_watch.py --health`.
+and `(unhealthy)` when none has completed for two intervals plus ten minutes, whether it crashed, hangs
+or every check fails. Run the check yourself with `docker exec trash-watch python -u trash_watch.py --health`.
 
 To be **alerted** when it stops checking, give it a heartbeat: a monitor that expects a ping after every
 completed check, and alerts when the pings stop (a crash, a hang, or checks that keep failing all stop them).
@@ -92,6 +94,7 @@ set `HEARTBEAT_URL` to their ping URL. The URL carries a token, so treat it as a
 
 ## Hearing about it again
 
-To get the current findings notified again (for example after changing the notifier), delete
-`data/state.json` and restart. The next run re-sends the findings and records a new baseline; it can't report
-upstream changes on that run.
+To get the current findings notified again (for example after changing the notifier), stop the service
+with `docker compose stop trash-watch`, delete only `data/state.json`, then start with
+`docker compose up -d`. The next run re-sends the findings and records a new baseline; it can't report
+upstream changes on that run. A first-ever check also establishes this upstream-change baseline.

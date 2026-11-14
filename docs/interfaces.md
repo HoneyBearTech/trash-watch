@@ -28,7 +28,7 @@ container-side paths the compose mounts use, so don't set them in `.env`.
 
 | Container path | Host | Mode | Contents |
 | --- | --- | --- | --- |
-| `/config` | `${RECYCLARR_CONFIG_PATH}` | **read-only** | `recyclarr.yml` / `recyclarr.yaml`, `configs/*.yml`, `includes/`, and for `template:` includes `repositories/config-templates/includes.json` (or `resources/config-templates/git/official/`) plus the files it names |
+| `/config` | `${RECYCLARR_CONFIG_PATH}` | **read-only** | `recyclarr.yml` / `recyclarr.yaml`, `configs/*.yml` / `configs/*.yaml` (the `*.y*ml` pattern), `includes/`, and for `template:` includes `repositories/config-templates/includes.json` (or `resources/config-templates/git/official/`) plus the files it names |
 | `/data` | `./data` (gitignored) | read-write | `guides/`: sparse clone of `TRaSH-Guides/Guides` (`docs/json` only); `state.json` |
 
 The container runs as `TRASH_WATCH_UID:TRASH_WATCH_GID` (1000:1000 by default), which must own `./data`. Its root
@@ -44,7 +44,8 @@ that names the fix ([upgrading.md](upgrading.md#from-a-root-running-version-befo
 | `DISCORD_WEBHOOK` | same | HTTP POST of `{"content": ...}`, 15 s timeout |
 | `HEARTBEAT_URL` | after every completed check | HTTP GET, 15 s timeout; a failure is logged and changes nothing else |
 
-Both get the phone-sized message described in [How it works](architecture.md#when-youre-notified). A
+The ntfy and Discord POSTs carry the phone-sized message described in
+[How it works](architecture.md#when-youre-notified); the heartbeat is a separate GET with no report. A
 failed notification is logged as `notify via <target> failed: ...` and doesn't stop the loop or the
 other target.
 
@@ -59,7 +60,7 @@ Everything is also printed to stdout (`docker compose logs trash-watch`): `OK â€
 | --- | --- |
 | `python -u trash_watch.py` | The image's default: check, notify on change, save state, sleep `INTERVAL_HOURS`, repeat (once with `RUN_ONCE=1`) |
 | `python -u trash_watch.py --health` | Exits 0 if a check completed within two intervals (plus ten minutes), 1 otherwise, and prints how long ago it was. The image's `HEALTHCHECK` runs it every 5 minutes (after a 15-minute start period), so `docker ps` and monitoring tools see `healthy` / `unhealthy`. |
-| `python -u trash_watch.py --suggest` | Prints Recyclarr YAML for every guide CF a profile doesn't score, then exits. Console only: it sends no notifications, writes no state, and never writes the config. Run it with `docker compose run --rm trash-watch python -u trash_watch.py --suggest` or `make suggest`. |
+| `python -u trash_watch.py --suggest` | Prints Recyclarr YAML for every guide CF a profile doesn't score, then exits. It synchronizes the guides cache, sends no notifications or heartbeat, writes no state, and never writes the config. Run it with `docker compose run --rm trash-watch python -u trash_watch.py --suggest` or `make suggest`. |
 
 ## Image
 

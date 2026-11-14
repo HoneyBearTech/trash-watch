@@ -7,6 +7,7 @@ Recyclarr's app-data directory: the host directory your Recyclarr container moun
 
 ```sh
 cp .env.example .env && chmod 600 .env
+mkdir -p data
 ```
 
 Edit `.env`:
@@ -18,17 +19,20 @@ Edit `.env`:
 - `PROFILE_MAP` if you've renamed guide profiles, and `IGNORE` for anything you skip on purpose; see
   [Interfaces](interfaces.md#settings). The one-time check below tells you which profiles need a mapping.
 
-`.env` holds secrets and is gitignored. Never commit it.
+`.env` holds secrets and is gitignored. Never commit it. Create `data/` before Compose so it belongs to
+your user. Its owner must match `TRASH_WATCH_UID` / `TRASH_WATCH_GID`; see
+[Installing](installing.md#2-create-env) if your host user differs from the default container identity.
 
 ## 2. Run a one-time check
 
 ```sh
 docker compose build
-docker compose run --rm -e RUN_ONCE=1 -e NTFY_URL= -e DISCORD_WEBHOOK= trash-watch
+docker compose run --rm -e RUN_ONCE=1 -e NTFY_URL= -e DISCORD_WEBHOOK= -e HEARTBEAT_URL= trash-watch
 ```
 
-The blank `NTFY_URL`/`DISCORD_WEBHOOK` keep this first run to your terminal. The first run clones the
-guides' JSON into `data/guides/`, which takes a few seconds. It then logs one line per profile:
+The blank `NTFY_URL`, `DISCORD_WEBHOOK` and independently configured `HEARTBEAT_URL` suppress outbound
+notifications and the heartbeat. This preview still fetches guides and saves `data/state.json`. The first
+run clones the guides' JSON into `data/guides/`, which takes a few seconds. It then logs one line per profile:
 `checked against <guide profile>`, `ignored`, or `NOT CHECKED`. Map each `NOT CHECKED` profile in
 `PROFILE_MAP`, or add it to `IGNORE` if it's your own, and run again. After that you'll see one of:
 
@@ -41,7 +45,10 @@ guides' JSON into `data/guides/`, which takes a few seconds. It then logs one li
   JSON, or no route to GitHub.
 
 To check that notifications arrive, run it again without the blank overrides. Because the first run saved
-its findings in `data/state.json`, delete that file first, or nothing new will be sent.
+its findings in `data/state.json`, stop any scheduled service with `docker compose stop trash-watch`,
+then delete only `data/state.json` before rerunning without the overrides. This discards the previous
+upstream-change baseline: the next check reports current findings and establishes a new baseline,
+without reporting upstream changes. Start the scheduled service again as shown below.
 
 ## 3. Leave it running
 

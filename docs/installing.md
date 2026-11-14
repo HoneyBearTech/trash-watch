@@ -1,8 +1,9 @@
 # Installing
 
 trash-watch runs as one container next to Recyclarr, on the Docker host that holds Recyclarr's config
-directory. It opens no ports and needs no account anywhere; it only reads the config and fetches the public
-TRaSH Guides. For a first look, the [quick start](quick-start.md) is shorter; this page covers the choices.
+directory. It opens no ports and needs no trash-watch account; optional notification services may need
+their own setup or account. It reads the config and fetches the public TRaSH Guides. For a first look,
+the [quick start](quick-start.md) is shorter; this page covers the choices.
 
 ## What you need
 
@@ -14,7 +15,7 @@ TRaSH Guides. For a first look, the [quick start](quick-start.md) is shorter; th
   docker inspect recyclarr --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Source}}{{end}}{{end}}'
   ```
 
-- Outbound HTTPS to github.com, and to your Discord webhook or ntfy server if you want notifications.
+- Outbound HTTPS to github.com, plus access to configured notification and heartbeat destinations.
 
 ## 1. Get the files
 
@@ -57,11 +58,13 @@ and [verify its signature](verifying-releases.md) before the first start. Pin a 
 ## 4. Check once, then start it
 
 ```sh
-docker compose run --rm -e RUN_ONCE=1 -e DISCORD_WEBHOOK= -e NTFY_URL= trash-watch
+docker compose run --rm -e RUN_ONCE=1 -e DISCORD_WEBHOOK= -e NTFY_URL= -e HEARTBEAT_URL= trash-watch
 ```
 
-The output lists each profile and what it was checked against. Map any `NOT CHECKED` profile in
-`PROFILE_MAP`, or add it to `IGNORE` if it's your own ([user guide](user-guide/README.md)). Then:
+The blank overrides suppress notifications and the independently configured heartbeat. This check still
+fetches the guides cache and saves `data/state.json`; see the [quick start](quick-start.md#2-run-a-one-time-check)
+to reset state before testing notification delivery. The output lists each profile and what it was
+checked against. Map any `NOT CHECKED` profile in `PROFILE_MAP`, or add it to `IGNORE` if it's your own ([user guide](user-guide/README.md)). Then:
 
 ```sh
 docker compose up -d
