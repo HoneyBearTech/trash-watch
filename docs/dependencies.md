@@ -38,6 +38,7 @@ base image pip builds it from the sdist. The sdist and PyYAML itself are still c
 without pins or hashes, so those two aren't "the same bytes" on every build. The maintainer accepted this
 rather than stay on 3.14. It ends when PyYAML publishes cp315 wheels: regenerate `requirements.txt` then, and
 the image installs from a wheel again. Released images carry an SBOM listing every package in them ([verifying-releases.md](verifying-releases.md)).
+
 **Known exception: the fuzz workflow stays on Python 3.14.** Atheris 3.1.0, its newest release, publishes
 wheels only for cp312 to cp314, so [`fuzz.yml`](../.github/workflows/fuzz.yml) can't move to 3.15 yet.
 [`renovate.json`](../renovate.json) holds that one `python-version` below 3.15 (the CI workflow, the
