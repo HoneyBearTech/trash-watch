@@ -51,7 +51,7 @@ Who can change the code, releases and project settings, as of the date of this f
 | Reading the repository from the maintainer's own server | that server | a read-only deploy key that only works for this repository |
 | The OpenSSF Best Practices badge entry | the maintainer | GitHub sign-in |
 | Security advisories and private vulnerability reports | the maintainer | GitHub |
-| Automated changes | Renovate (pull requests); it turns on auto-merge for its updates, which GitHub merges only after every required check passes | GitHub, short-lived `GITHUB_TOKEN` |
+| Automated changes | Renovate (pull requests); it turns on auto-merge for its updates, which GitHub merges only after every required check passes | the Renovate GitHub App |
 
 There are no other collaborators. Workflows use the per-job `GITHUB_TOKEN`, read-only unless a job asks for
 more, and repository secrets are only available to the workflows that name them, never to pull requests

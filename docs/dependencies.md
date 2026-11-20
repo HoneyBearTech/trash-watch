@@ -63,7 +63,8 @@ To update a pinned Python dependency, edit the `.in` file if needed and run
   exception is the fuzz workflow's Python version (see above), which stays below 3.15.
 - A merged update reaches users only in the next release; the maintainer's own deployment runs a released
   image pinned by digest.
-- The CI-only images in `run:` steps and the images in `.gitlab-ci.yml` aren't seen by Renovate; they're
+- The images in `.gitlab-ci.yml` are tracked by Renovate (the `gitlabci` manager) and merge automatically like
+  the rest. Only CI images named inside shell commands in `run:` steps, if any, aren't seen by Renovate; they're
   bumped by hand at least every quarter.
 
 ## Policy for vulnerabilities in dependencies
