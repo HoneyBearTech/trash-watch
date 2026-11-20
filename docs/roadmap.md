@@ -23,6 +23,8 @@ first release: a signed multi-arch image on GHCR with an SBOM and provenance.
   as project security goals.
 - The OpenSSF Best Practices badge (Passing, then Silver) and OSPS Baseline Levels 1 and 2.
 - A healthy OpenSSF Scorecard: pinned dependencies, signed releases, code review on `main`.
+- Move the fuzz workflow to Python 3.15 once Atheris publishes 3.15 wheels: remove the hold in
+  `renovate.json` and correct the workflow comment that calls 3.14 "the image's Python" (the owner's file).
 
 **Checks**
 

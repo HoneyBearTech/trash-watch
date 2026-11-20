@@ -20,6 +20,14 @@
     {
       "matchUpdateTypes": ["major"],
       "addLabels": ["major"]
+    },
+    {
+      "description": "Keep the Python version of the fuzz workflow below 3.15: Atheris has no Python 3.15 wheels yet (newest release 3.1.0 has cp312-cp314 only), so fuzz jobs would fail to install it. Remove this rule once Atheris publishes cp315 wheels.",
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [".github/workflows/fuzz.yml"],
+      "matchDepNames": ["python"],
+      "matchDepTypes": ["uses-with"],
+      "allowedVersions": "<3.15"
     }
   ],
   "enabledManagers": [
