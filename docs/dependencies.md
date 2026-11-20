@@ -49,23 +49,21 @@ To update a pinned Python dependency, edit the `.in` file if needed and run
 
 ## Tracking dependencies
 
-- **Dependabot** ([`.github/dependabot.yml`](../.github/dependabot.yml)) checks weekly for new versions of
-  the base image, the Python packages and the GitHub Actions, and opens a pull request for each. Dependabot
-  alerts and security updates are on.
+- **Renovate** ([`renovate.json`](../renovate.json)) checks weekly (Mondays, before 6am Central) for new
+  versions of the base image, the Python packages and the GitHub Actions, and opens a pull request for each.
+  Dependabot alerts are on.
 - **Dependency review** ([`.github/workflows/dependency-review.yml`](../.github/workflows/dependency-review.yml))
   blocks a pull request that adds or changes a dependency with a known vulnerability of moderate severity or
   higher, or with a license outside the allowlist.
-- **Low-risk updates merge automatically**
-  ([`.github/workflows/dependabot-auto-merge.yml`](../.github/workflows/dependabot-auto-merge.yml)): patch
-  and minor updates to the Python packages and GitHub Actions, and patch updates to the base image
-  (3.15.0 to 3.15.1), are squash-merged once every required check has passed (CI with the image build and
-  start, CodeQL, dependency review). Nothing skips a check, and a failing update stays open for the
-  maintainer.
-- **Everything else is merged by hand**: major updates, and a base image moving to a new Python minor
-  (3.15 to 3.16), get a one-time check against a real config first.
+- **Renovate merges its updates itself.** Every update (patch, minor and major, to the Python packages, the
+  GitHub Actions and the base image, including a new Python minor such as 3.15 to 3.16) is squash-merged once
+  every required check has passed (CI with the image build and start, CodeQL, dependency review). A new
+  version is proposed only after it is 3 days old; security fixes and image rebuilds (a new digest under the
+  same tag) don't wait. Nothing skips a check, and a failing update stays open for the maintainer. The one
+  exception is the fuzz workflow's Python version (see above), which stays below 3.15.
 - A merged update reaches users only in the next release; the maintainer's own deployment runs a released
   image pinned by digest.
-- The CI-only images in `run:` steps and the images in `.gitlab-ci.yml` aren't seen by Dependabot; they're
+- The CI-only images in `run:` steps and the images in `.gitlab-ci.yml` aren't seen by Renovate; they're
   bumped by hand at least every quarter.
 
 ## Policy for vulnerabilities in dependencies
@@ -84,7 +82,7 @@ neither waits for the Python image to be rebuilt.
 
 Each finding is triaged within 14 days:
 
-1. **If a fixed release exists**, bump to it (a Dependabot pull request usually already does) and merge. A
+1. **If a fixed release exists**, bump to it (a Renovate pull request usually already does) and merge. A
    fix for an exploitable critical or high-severity vulnerability goes out in a patch release within 30
    days; others go out with the next release.
 2. **If upstream hasn't released a fix**, assess whether the vulnerable code is reachable in trash-watch

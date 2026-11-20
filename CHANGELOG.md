@@ -8,6 +8,9 @@ All notable changes to trash-watch are documented here. The format follows
 
 ### Changed
 
+- Renovate now merges its pull requests by itself, major updates included, once every required check has
+  passed and the new version is 3 days old (docs/dependencies.md); only the fuzz workflow's Python version
+  stays held back.
 - The image is built on `python:3.15-slim`. PyYAML has no Python 3.15 wheel yet, so pip builds it from its
   hash-checked sdist; the build tools it uses aren't hash-pinned (see docs/dependencies.md). CI and the GitLab
   pipeline still test on 3.14 until PyYAML ships 3.15 wheels.
