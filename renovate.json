@@ -7,7 +7,7 @@
   "labels": ["dependencies"],
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
-    "labels": ["security"]
+    "labels": ["security", "openssf"]
   },
   "automerge": true,
   "automergeType": "pr",
