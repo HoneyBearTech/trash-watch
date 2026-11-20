@@ -87,7 +87,7 @@ notifiers (only their status matters). The full list of settings, mounts and con
 | Incorrect logic hiding drift | Each check has a fixture case; an exact-findings test catches new false positives; profile coverage is logged on every run | [`tests/`](../tests/); `test_exactly_the_expected_findings`, `test_unmatched_and_ignored_profiles_are_logged_not_silently_skipped` |
 | Inclusion of functionality from an untrusted source (CWE-829, CWE-494) | Digest-pinned base image, hash-pinned packages, SHA-pinned Actions; signed releases | [`Dockerfile`](../Dockerfile), [`requirements.txt`](../requirements.txt), the workflows; OpenSSF Scorecard (Pinned-Dependencies) |
 | Injection into CI scripts (CWE-78, CWE-94) | Untrusted values reach `run:` scripts only through `env:`; no `pull_request_target` | actionlint and shellcheck in CI; CodeQL for Actions |
-| Use of components with known vulnerabilities (CWE-1395) | Weekly Trivy scan of the `main` build and the latest release to code scanning; Debian security updates applied at build time; pip removed from the image; Dependabot for the base image, packages and Actions; dependency review on pull requests | [dependencies.md](dependencies.md) |
+| Use of components with known vulnerabilities (CWE-1395) | Weekly Trivy scan of the `main` build and the latest release to code scanning; Debian security updates applied at build time; pip removed from the image; Renovate for the base image, packages and Actions; dependency review on pull requests | [dependencies.md](dependencies.md) |
 
 ## 5. Verification evidence
 

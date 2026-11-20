@@ -9,10 +9,21 @@
   "vulnerabilityAlerts": {
     "labels": ["security"]
   },
-  "automerge": false,
+  "automerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "platformAutomerge": true,
+  "minimumReleaseAge": "3 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "schedule": ["before 6am on monday"],
   "timezone": "America/Chicago",
   "packageRules": [
+    {
+      "description": "An image rebuild (a new digest under the same tag) doesn't wait: Docker Hub dates it by the tag's last push, so a tag rebuilt about weekly would restart the 3-day clock each time and never get through the Monday-only schedule. Only images: a moved tag on an Action keeps the wait.",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest"],
+      "minimumReleaseAge": null
+    },
     {
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "minor and patch dependencies"
